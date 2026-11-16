@@ -45,3 +45,8 @@ npm-debug.log*
 *~
 .DS_Store
 Thumbs.db
+
+# Documentos internos privados
+plan.md
+*.docx
+*.pdf
