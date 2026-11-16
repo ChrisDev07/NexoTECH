@@ -44,52 +44,55 @@ flowchart LR
 
 ## 🏛️ 3. Arquitectura del Proyecto
 
-El repositorio está organizado como una estructura modular limpia:
+El repositorio está organizado bajo una estructura modular orientada a desacoplamiento y escalabilidad:
 
 ```text
 MyPymes/
-├── docs/                     # Documentación técnica y guion de presentación
-│   └── pitch_deck_guion.md   # Guion cronometrado y Q&A de defensa para el jurado
-├── core_nlp/                 # Motor NLP heurístico local y catálogo casanareño
-│   ├── catalog.json          # Catálogo con unidades locales (arrobas, bultos, cargas)
-│   ├── parser.py             # Normalizador, extractor de entidades y fuzzy matching
-│   └── test_parser.py        # Pruebas unitarias de lenguaje natural
-├── backend/                  # API REST de sincronización y compras colectivas
-│   ├── models.py             # Esquemas de datos (Ledger y compras)
-│   ├── ledger.py             # Modelo de datos inmutable (Event Sourcing)
-│   ├── server.py             # Servidor API ligero (Python estándar sin dependencias)
-│   ├── simulate_pitch_demo.py# Script interactivo oficial para el Demo Day
-│   ├── static/               # Simulador web interactivo
-│   └── test_ledger.py        # Pruebas unitarias del libro mayor
-├── mobile/                   # Aplicación móvil Flutter (Android 12+ / iOS 16+)
-│   ├── lib/                  # Código Dart de la interfaz y botón PTT
-│   ├── assets/               # Catálogo regional precargado
-│   └── pubspec.yaml          # Configuración y dependencias Flutter
-├── .gitignore                # Exclusiones del entorno
-└── README.md                 # Visión, arquitectura y puesta en marcha
+├── docs/                     # Documentación técnica y especificaciones
+│   └── guion_presentacion.md # Estructura técnica de presentación y defensa
+├── core_nlp/                 # Motor de procesamiento de lenguaje natural heurístico local
+│   ├── catalog.json          # Catálogo tipificado con métricas y unidades regionales
+│   ├── parser.py             # Normalización léxica, extracción de entidades y fuzzy matching
+│   └── test_parser.py        # Suite de pruebas unitarias de interpretación lingüística
+├── backend/                  # Servicios de sincronización y motor de agregación
+│   ├── models.py             # Modelos de dominio y contratos de datos
+│   ├── ledger.py             # Modelo inmutable de transacciones (Event Sourcing)
+│   ├── server.py             # Servidor de servicios REST y consola de monitoreo
+│   ├── simulate_workflow.py  # Módulo de validación de flujo integral y red colectiva
+│   ├── static/               # Consola web de interacción en tiempo real
+│   └── test_ledger.py        # Pruebas unitarias de integridad transaccional
+├── mobile/                   # Cliente móvil multiplataforma (Flutter / Dart)
+│   ├── lib/                  # Vistas operativas y controlador de captura oral (PTT)
+│   ├── assets/               # Catálogo regional para resolución sin conectividad
+│   └── pubspec.yaml          # Definición de arquitectura y dependencias móviles
+├── .gitignore                # Reglas de exclusión de artefactos y entorno
+└── README.md                 # Documento técnico principal
 ```
 
 ---
 
-## ⚡ 4. Puesta en Marcha Rápida (Avance para la Convocatoria)
+## ⚡ 4. Guía de Ejecución y Validación Técnica
 
-El prototipo fue diseñado para funcionar de inmediato en cualquier equipo con **Python 3.8+**, sin requerir la instalación de dependencias externas.
+La arquitectura del prototipo fue concebida para garantizar una validación técnica ágil e independiente, ejecutándose de forma nativa bajo **Python 3.8+** sin dependencias externas requeridas.
 
-### 1. Ejecutar las Pruebas Unitarias del Motor NLP:
+### 4.1. Verificación del Motor Lingüístico Local (NLP Heurístico):
+Ejecución de la suite de pruebas automatizadas para comprobar el reconocimiento de modismos regionales, normalización numérica y extracción estructurada de entidades:
 ```bash
 python3 core_nlp/test_parser.py
 ```
 
-### 2. Ejecutar la Simulación Oficial para el Pitch (Demo Day):
+### 4.2. Simulación de Flujo Operativo Integral (Modo Desconectado y Red Colectiva):
+Demostración del ciclo completo de inventario bajo arquitectura Event Sourcing, cálculo reactivo de existencias críticas y consolidación de demanda mayorista entre comercios geolocalizados:
 ```bash
-python3 backend/simulate_pitch_demo.py
+python3 backend/simulate_workflow.py
 ```
 
-### 3. Iniciar el Servidor y Simulador Interactivo Web:
+### 4.3. Inicialización del Servidor y Consola de Monitoreo:
+Despliegue del servicio local para interacción en tiempo real mediante interfaz gráfica:
 ```bash
 python3 backend/server.py
 ```
-Abre en tu navegador `http://localhost:8000` para interactuar con la pantalla de dictado por voz y la central de compras en tiempo real.
+Acceso a la consola operativa en: `http://localhost:8000`
 
 ---
 
