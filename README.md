@@ -4,9 +4,9 @@
 > Proyecto desarrollado por el equipo **NexoTECH** para la convocatoria de innovación abierta **CREATIC Casanare**  
 > *Gobernación de Casanare – Dirección TIC / EON CASANARE S.A.S.*
 
-[![TRL Level](https://img.shields.io/badge/Madurez-TRL%204--5-brightgreen)](plan.md)
-[![Status](https://img.shields.io/badge/Estado-Prototipo%20Funcional-blue)](plan.md)
-[![Licencia](https://img.shields.io/badge/Licencia-MIT-orange)](LICENSE)
+![TRL Level](https://img.shields.io/badge/Madurez-TRL%204--5-brightgreen)
+![Status](https://img.shields.io/badge/Estado-Prototipo%20Funcional-blue)
+![Licencia](https://img.shields.io/badge/Licencia-MIT-orange)
 
 ---
 
@@ -48,47 +48,44 @@ El repositorio está organizado como una estructura modular limpia:
 
 ```text
 MyPymes/
-├── docs/                     # Documentación, anteproyecto oficial y guion de pitch
-│   └── Anteproyecto NexoTECH.docx
+├── docs/                     # Documentación técnica y guion de presentación
+│   └── pitch_deck_guion.md   # Guion cronometrado y Q&A de defensa para el jurado
 ├── core_nlp/                 # Motor NLP heurístico local y catálogo casanareño
 │   ├── catalog.json          # Catálogo con unidades locales (arrobas, bultos, cargas)
 │   ├── parser.py             # Normalizador, extractor de entidades y fuzzy matching
 │   └── test_parser.py        # Pruebas unitarias de lenguaje natural
 ├── backend/                  # API REST de sincronización y compras colectivas
-│   ├── models.py             # Esquemas de datos (Pydantic / Dataclasses)
+│   ├── models.py             # Esquemas de datos (Ledger y compras)
 │   ├── ledger.py             # Modelo de datos inmutable (Event Sourcing)
-│   ├── server.py             # Servidor API FastAPI
-│   ├── simulate_pitch_demo.py# Script de simulación para el Pitch Day
-│   └── static/               # Simulador interactivo web
-├── mobile/                   # Aplicación móvil Flutter (Android / iOS)
-├── plan.md                   # Plan de desarrollo y hoja de ruta TRL 4-5
-└── README.md                 # Este archivo
+│   ├── server.py             # Servidor API ligero (Python estándar sin dependencias)
+│   ├── simulate_pitch_demo.py# Script interactivo oficial para el Demo Day
+│   ├── static/               # Simulador web interactivo
+│   └── test_ledger.py        # Pruebas unitarias del libro mayor
+├── mobile/                   # Aplicación móvil Flutter (Android 12+ / iOS 16+)
+│   ├── lib/                  # Código Dart de la interfaz y botón PTT
+│   ├── assets/               # Catálogo regional precargado
+│   └── pubspec.yaml          # Configuración y dependencias Flutter
+├── .gitignore                # Exclusiones del entorno
+└── README.md                 # Visión, arquitectura y puesta en marcha
 ```
 
 ---
 
 ## ⚡ 4. Puesta en Marcha Rápida (Avance para la Convocatoria)
 
-### Requisitos
-* Python 3.9 o superior.
-* Navegador web moderno.
+El prototipo fue diseñado para funcionar de inmediato en cualquier equipo con **Python 3.8+**, sin requerir la instalación de dependencias externas.
 
-### Instalación de dependencias del prototipo:
-```bash
-pip install fastapi uvicorn pydantic
-```
-
-### Ejecutar las Pruebas del Motor NLP:
+### 1. Ejecutar las Pruebas Unitarias del Motor NLP:
 ```bash
 python3 core_nlp/test_parser.py
 ```
 
-### Ejecutar la Simulación Oficial para el Pitch (Demo Day):
+### 2. Ejecutar la Simulación Oficial para el Pitch (Demo Day):
 ```bash
 python3 backend/simulate_pitch_demo.py
 ```
 
-### Iniciar el Servidor y Simulador Interactivo:
+### 3. Iniciar el Servidor y Simulador Interactivo Web:
 ```bash
 python3 backend/server.py
 ```
@@ -98,4 +95,4 @@ Abre en tu navegador `http://localhost:8000` para interactuar con la pantalla de
 
 ## 🛡️ 5. Cumplimiento Normativo y Seguridad
 * **Protección de Datos Personales:** Cumple estrictamente con la **Ley 1581 de 2012** (Habeas Data Colombia), minimizando la recolección de datos personales de clientes finales.
-* **Ciberseguridad:** Comunicaciones encriptadas vía TLS 1.2+, base de datos local protegida, transacciones inmutables mediante UUIDs v4 para evitar conflictos en sincronización fuera de línea.
+* **Ciberseguridad:** Transacciones inmutables mediante UUIDs v4 (*Event Sourcing*) para evitar inconsistencias en sincronización fuera de línea y cifrado en reposo y en tránsito.
