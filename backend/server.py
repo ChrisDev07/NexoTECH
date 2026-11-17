@@ -20,13 +20,20 @@ from parser import RegionalNLPParser
 from ledger import LocalLedger, CollectivePurchasingEngine
 from models import Movement
 
-# Inicialización de estado global en memoria
+# Inicialización de estado global persistente en SQLite
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "origo_data.db")
 PARSER = RegionalNLPParser()
-LEDGER = LocalLedger(":memory:")
+LEDGER = LocalLedger(DB_PATH)
 COLLECTIVE_ENGINE = CollectivePurchasingEngine(freight_cost_cop=120000.0)
 
-# Precargar saldo inicial (antes de 00:00) y movimientos de muestra del día
-def seed_demo_data():
+# Precargar saldo inicial (antes de 00:00) y movimientos de muestra del día solo si la BD está vacía
+def seed_demo_data(force: bool = False):
+    if not force and len(LEDGER.get_all_movements()) > 0:
+        return
+    if force:
+        with LEDGER.conn:
+            LEDGER.conn.execute("DELETE FROM movements")
+
     now = datetime.now()
     start_of_today = datetime(now.year, now.month, now.day, 0, 0, 0).timestamp()
     opening_ts = start_of_today - 3600  # Cierre de ayer = Saldo inicial de hoy 00:00
@@ -53,6 +60,7 @@ class OrigoHandler(BaseHTTPRequestHandler):
     def _send_json(self, data, status=200):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
@@ -137,7 +145,8 @@ class OrigoHandler(BaseHTTPRequestHandler):
                 })
                 LEDGER.record_movement(mov)
                 recorded.append(mov.to_dict())
-            self._send_json({"status": "ok", "recorded": recorded})
+            daily_stock = LEDGER.compute_daily_stock(PARSER.catalog["products"])
+            self._send_json({"status": "ok", "recorded": recorded, "daily_stock": daily_stock})
 
         elif path == "/api/sync":
             pending = LEDGER.get_pending_sync_movements()
@@ -156,7 +165,7 @@ class OrigoHandler(BaseHTTPRequestHandler):
             self._send_json(res)
 
         elif path == "/api/reset":
-            seed_demo_data()
+            seed_demo_data(force=True)
             self._send_json({"status": "ok", "message": "Datos reiniciados"})
 
         else:
