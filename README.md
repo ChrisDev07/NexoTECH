@@ -21,9 +21,9 @@ Esto genera tres pérdidas críticas diarias:
 
 ---
 
-## 💡 2. La Solución: NexoLlano
+## 💡 2. La Solución: Origo
 
-**NexoLlano** integra los dos procesos clave de la cadena de valor en una solución accesible y de alto impacto:
+**Origo** integra los dos procesos clave de la cadena de valor en una solución accesible y de alto impacto:
 
 ```mermaid
 flowchart LR
