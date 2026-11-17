@@ -2,208 +2,1095 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Origo - Plataforma de Operación MiPyME</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Origo 🌾 · Mi Tienda al Día</title>
   <style>
     :root {
-      --primary: #059669;
-      --primary-dark: #047857;
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --border: #334155;
-      --text: #f8fafc;
-      --text-muted: #94a3b8;
+      --primary: #047857;
+      --primary-light: #059669;
+      --primary-soft: #d1fae5;
+      --primary-text: #065f46;
       --accent: #f59e0b;
-      --danger: #ef4444;
-      --success: #10b981;
+      --accent-soft: #fef3c7;
+      --accent-text: #92400e;
+      --danger: #dc2626;
+      --danger-soft: #fee2e2;
+      --danger-text: #b91c1c;
+      --bg-outer: #e7e5e4;
+      --canvas: #faf9f6;
+      --card: #ffffff;
+      --text: #1c1917;
+      --text-muted: #57534e;
+      --border: #e7e5e4;
+      --shadow-sm: 0 2px 8px rgba(28, 25, 23, 0.05);
+      --shadow-md: 0 8px 24px rgba(28, 25, 23, 0.09);
+      --radius-lg: 22px;
+      --radius-md: 16px;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; }
-    .container { max-width: 1100px; margin: 0 auto; }
-    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
-    .badge { background: #065f46; color: #a7f3d0; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
-    .mode-airplane { background: #374151; color: #e5e7eb; padding: 8px 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); font-weight: 500; font-size: 0.9rem; }
-    .mode-airplane.active { background: #b45309; border-color: #f59e0b; color: white; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
-    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 22px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); }
-    h2 { font-size: 1.25rem; margin-bottom: 15px; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
-    
-    /* Mic Control */
-    .mic-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 10px; background: #0b1329; border: 2px dashed #334155; border-radius: 12px; margin-bottom: 18px; text-align: center; }
-    .btn-mic { width: 84px; height: 84px; border-radius: 50%; border: none; background: #059669; color: white; font-size: 2.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4); transition: all 0.2s ease-in-out; }
-    .btn-mic:hover { transform: scale(1.05); background: #047857; }
-    .btn-mic.recording { background: #dc2626; box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); animation: pulse-ring 1.4s infinite cubic-bezier(0.66, 0, 0, 1); }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: var(--bg-outer);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    /* Mobile App Shell */
+    .app-shell {
+      width: 100%;
+      max-width: 440px;
+      min-height: 100vh;
+      background: var(--canvas);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.14);
+      padding-bottom: 84px;
+    }
+
+    @media (min-width: 500px) {
+      body {
+        padding: 20px 12px;
+      }
+      .app-shell {
+        min-height: calc(100vh - 40px);
+        border-radius: 32px;
+        overflow: hidden;
+        border: 6px solid #1c1917;
+      }
+    }
+
+    /* Header */
+    .app-header {
+      background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+      color: #ffffff;
+      padding: 20px 20px 22px;
+      border-bottom-left-radius: 26px;
+      border-bottom-right-radius: 26px;
+      box-shadow: 0 6px 18px rgba(4, 120, 87, 0.22);
+    }
+
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .brand-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.18);
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 0.9rem;
+      letter-spacing: 0.5px;
+    }
+
+    .conn-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      border: 1.5px solid rgba(255, 255, 255, 0.35);
+      padding: 7px 12px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .conn-pill.offline {
+      background: #f59e0b;
+      color: #1c1917;
+      border-color: #fde68a;
+    }
+
+    .greeting {
+      font-size: 1.45rem;
+      font-weight: 800;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+
+    .store-sub {
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.88);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Main Content & Views */
+    .app-content {
+      padding: 18px 16px;
+      flex: 1;
+    }
+
+    .tab-view {
+      display: none;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .tab-view.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Voice Hero Card */
+    .voice-hero {
+      background: var(--card);
+      border-radius: var(--radius-lg);
+      padding: 24px 18px 20px;
+      text-align: center;
+      box-shadow: var(--shadow-md);
+      border: 1px solid var(--border);
+      margin-bottom: 18px;
+    }
+
+    .voice-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+
+    .voice-hint {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+      line-height: 1.4;
+    }
+
+    .mic-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .btn-mic-hero {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(145deg, #059669, #047857);
+      color: #ffffff;
+      font-size: 2.6rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 10px 24px rgba(4, 120, 87, 0.36);
+      transition: transform 0.15s ease, background 0.2s;
+      position: relative;
+    }
+
+    .btn-mic-hero:active {
+      transform: scale(0.95);
+    }
+
+    .btn-mic-hero.recording {
+      background: linear-gradient(145deg, #ef4444, #dc2626);
+      box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.65);
+      animation: pulse-ring 1.35s infinite cubic-bezier(0.66, 0, 0, 1);
+    }
+
     @keyframes pulse-ring {
-      0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-      70% { box-shadow: 0 0 0 18px rgba(220, 38, 38, 0); }
+      0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); }
+      70% { box-shadow: 0 0 0 22px rgba(220, 38, 38, 0); }
       100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
     }
-    .mic-status { margin-top: 12px; font-size: 0.95rem; font-weight: 600; color: #94a3b8; }
-    .mic-status.active { color: #f87171; }
-    .mic-transcript { margin-top: 8px; font-size: 0.88rem; color: #38bdf8; min-height: 20px; font-style: italic; }
 
-    .input-box { display: flex; gap: 10px; margin-bottom: 15px; }
-    input[type="text"] { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); background: #0f172a; color: white; font-size: 0.95rem; }
-    button { padding: 10px 18px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-    .btn-primary { background: var(--primary); color: white; }
-    .btn-primary:hover { background: var(--primary-dark); }
-    .btn-accent { background: var(--accent); color: #000; font-size: 0.95rem; }
-    .quick-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
-    .chip { background: #334155; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; border: 1px solid #475569; }
-    .chip:hover { background: #475569; border-color: #64748b; }
-    .table-container { overflow-x: auto; margin-top: 10px; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
-    th { color: var(--text-muted); font-weight: 600; }
-    .tag-critical { background: #7f1d1d; color: #fecaca; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
-    .tag-ok { background: #064e3b; color: #a7f3d0; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; }
-    .confirmation-card { background: #0f172a; border: 2px solid #0284c7; border-radius: 8px; padding: 16px; margin-top: 15px; display: none; }
-    .collective-summary { background: #132e2b; border: 1px solid #10b981; border-radius: 8px; padding: 18px; margin-top: 15px; }
-    .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
-    .stat-val-highlight { color: #34d399; font-weight: bold; font-size: 1.25rem; }
+    .mic-status-text {
+      margin-top: 12px;
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .mic-status-text.error {
+      color: var(--danger);
+    }
+
+    .mic-transcript-box {
+      margin-top: 8px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      min-height: 20px;
+      line-height: 1.4;
+    }
+
+    /* Quick Dictation Chips */
+    .chips-label {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-bottom: 8px;
+      text-align: left;
+    }
+
+    .chips-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .quick-chip {
+      background: #f5f5f4;
+      color: var(--text);
+      border: 1.5px solid #d6d3d1;
+      padding: 9px 12px;
+      border-radius: 12px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: left;
+    }
+
+    .quick-chip:hover, .quick-chip:active {
+      background: var(--primary-soft);
+      border-color: var(--primary);
+      color: var(--primary-text);
+    }
+
+    /* Manual Input Toggle */
+    .manual-toggle-btn {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .manual-box {
+      display: none;
+      margin-top: 10px;
+      gap: 8px;
+    }
+
+    .manual-box.open {
+      display: flex;
+    }
+
+    .manual-input {
+      flex: 1;
+      padding: 13px 14px;
+      border-radius: 14px;
+      border: 2px solid #d6d3d1;
+      font-size: 0.95rem;
+      background: #faf9f6;
+      color: var(--text);
+    }
+
+    .manual-input:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: #ffffff;
+    }
+
+    .btn-send {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 0 18px;
+      border-radius: 14px;
+      font-weight: 800;
+      font-size: 0.95rem;
+      cursor: pointer;
+    }
+
+    /* Alert Banner */
+    .alert-banner {
+      background: var(--danger-soft);
+      border: 1.5px solid #fca5a5;
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      margin-bottom: 18px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .alert-banner.visible {
+      display: flex;
+    }
+
+    .alert-text {
+      color: var(--danger-text);
+      font-size: 0.92rem;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .alert-cta {
+      background: var(--danger);
+      color: #ffffff;
+      border: none;
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-weight: 800;
+      font-size: 0.82rem;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+
+    /* Section Header */
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+
+    .section-link {
+      background: none;
+      border: none;
+      color: var(--primary);
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    /* Visual Stock Cards */
+    .stock-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .product-card {
+      background: var(--card);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border: 1.5px solid var(--border);
+      box-shadow: var(--shadow-sm);
+      cursor: pointer;
+      transition: transform 0.12s;
+    }
+
+    .product-card:active {
+      transform: scale(0.985);
+    }
+
+    .product-card.critical {
+      border-color: #fca5a5;
+      background: #fffafa;
+    }
+
+    .product-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .product-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: #f5f5f4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      flex-shrink: 0;
+    }
+
+    .product-name {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .product-meta {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+    }
+
+    .stock-pill {
+      padding: 7px 12px;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      font-weight: 800;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .stock-pill.ok {
+      background: var(--primary-soft);
+      color: var(--primary-text);
+    }
+
+    .stock-pill.low {
+      background: var(--danger-soft);
+      color: var(--danger-text);
+    }
+
+    /* Filter Chips in Bodega */
+    .filter-scroll {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+      scrollbar-width: none;
+    }
+    .filter-scroll::-webkit-scrollbar { display: none; }
+
+    .filter-pill {
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .filter-pill.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    /* History Card */
+    .history-card {
+      background: var(--card);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .sync-badge {
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 4px 8px;
+      border-radius: 8px;
+    }
+    .sync-badge.synced { background: #ecfdf5; color: #047857; }
+    .sync-badge.pending { background: #fef3c7; color: #b45309; }
+
+    /* Collective Tab */
+    .community-hero {
+      background: linear-gradient(135deg, #047857 0%, #0f766e 100%);
+      color: #ffffff;
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 8px 20px rgba(4, 120, 87, 0.25);
+    }
+
+    .community-hero h2 {
+      font-size: 1.3rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .community-hero p {
+      font-size: 0.92rem;
+      opacity: 0.92;
+      line-height: 1.4;
+    }
+
+    .progress-card {
+      background: var(--card);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      border: 1.5px solid var(--border);
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .progress-bar-bg {
+      height: 16px;
+      background: #e7e5e4;
+      border-radius: 999px;
+      overflow: hidden;
+      margin: 12px 0 8px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #059669, #f59e0b);
+      border-radius: 999px;
+      transition: width 0.5s ease;
+    }
+
+    .savings-card {
+      background: linear-gradient(145deg, #fffbeb 0%, #fef3c7 100%);
+      border: 2px solid #f59e0b;
+      border-radius: var(--radius-lg);
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+
+    .savings-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.95rem;
+      color: #78350f;
+    }
+
+    .savings-total {
+      border-top: 2px dashed #f59e0b;
+      padding-top: 12px;
+      margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .savings-total-val {
+      font-size: 1.45rem;
+      font-weight: 900;
+      color: #047857;
+    }
+
+    .btn-join-community {
+      width: 100%;
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #1c1917;
+      border: none;
+      padding: 16px;
+      border-radius: 16px;
+      font-size: 1.05rem;
+      font-weight: 900;
+      cursor: pointer;
+      box-shadow: 0 6px 16px rgba(245, 158, 11, 0.35);
+      margin-bottom: 18px;
+      transition: transform 0.15s;
+    }
+
+    .btn-join-community:active {
+      transform: scale(0.98);
+    }
+
+    .neighbor-row {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.92rem;
+    }
+
+    /* Bottom Navigation Bar */
+    .bottom-nav {
+      position: fixed;
+      bottom: 0;
+      width: 100%;
+      max-width: 440px;
+      background: #ffffff;
+      border-top: 1.5px solid var(--border);
+      display: flex;
+      justify-content: space-around;
+      padding: 8px 6px 12px;
+      z-index: 50;
+      box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
+    }
+
+    @media (min-width: 500px) {
+      .bottom-nav {
+        position: sticky;
+        bottom: 0;
+        border-bottom-left-radius: 26px;
+        border-bottom-right-radius: 26px;
+      }
+      .app-shell {
+        padding-bottom: 0;
+      }
+    }
+
+    .nav-btn {
+      flex: 1;
+      background: none;
+      border: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 4px;
+      border-radius: 14px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-weight: 700;
+      font-size: 0.82rem;
+      transition: all 0.15s;
+    }
+
+    .nav-btn .nav-icon {
+      font-size: 1.45rem;
+    }
+
+    .nav-btn.active {
+      color: var(--primary);
+      background: var(--primary-soft);
+    }
+
+    /* Bottom Sheet Confirmation Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(28, 25, 23, 0.55);
+      backdrop-filter: blur(4px);
+      display: none;
+      justify-content: center;
+      align-items: flex-end;
+      z-index: 100;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .bottom-sheet {
+      width: 100%;
+      max-width: 440px;
+      background: #ffffff;
+      border-top-left-radius: 28px;
+      border-top-right-radius: 28px;
+      padding: 20px 20px 28px;
+      box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.25);
+      animation: slideUp 0.25s ease-out;
+      max-height: 88vh;
+      overflow-y: auto;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .sheet-handle {
+      width: 48px;
+      height: 5px;
+      background: #d6d3d1;
+      border-radius: 999px;
+      margin: 0 auto 16px;
+    }
+
+    .sheet-title {
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: var(--text);
+      margin-bottom: 4px;
+      text-align: center;
+    }
+
+    .sheet-sub {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 16px;
+    }
+
+    .receipt-item {
+      background: #faf9f6;
+      border: 2px solid #e7e5e4;
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .receipt-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .action-toggle {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 0.85rem;
+      border: none;
+      cursor: pointer;
+    }
+
+    .action-toggle.out {
+      background: #ffedd5;
+      color: #c2410c;
+    }
+
+    .action-toggle.in {
+      background: var(--primary-soft);
+      color: var(--primary-text);
+    }
+
+    .certainty-badge {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    .receipt-prod {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .stepper-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #ffffff;
+      border: 1.5px solid #d6d3d1;
+      border-radius: 16px;
+      padding: 8px 12px;
+    }
+
+    .btn-step {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: none;
+      background: var(--primary-soft);
+      color: var(--primary-text);
+      font-size: 1.6rem;
+      font-weight: 900;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-step:active {
+      transform: scale(0.92);
+    }
+
+    .stepper-val {
+      font-size: 1.25rem;
+      font-weight: 900;
+      color: var(--text);
+    }
+
+    .btn-confirm-big {
+      width: 100%;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 17px;
+      border-radius: 16px;
+      font-size: 1.1rem;
+      font-weight: 900;
+      cursor: pointer;
+      margin-top: 8px;
+      box-shadow: 0 6px 16px rgba(4, 120, 87, 0.3);
+    }
+
+    .btn-cancel-big {
+      width: 100%;
+      background: #f5f5f4;
+      color: var(--text-muted);
+      border: none;
+      padding: 14px;
+      border-radius: 14px;
+      font-size: 0.98rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      background: #1c1917;
+      color: #ffffff;
+      padding: 13px 20px;
+      border-radius: 999px;
+      font-size: 0.92rem;
+      font-weight: 700;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+      transition: transform 0.3s ease;
+      z-index: 200;
+      max-width: 90%;
+      text-align: center;
+    }
+
+    .toast.show {
+      transform: translateX(-50%) translateY(0);
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div>
-        <h1>🌾 Origo</h1>
-        <p style="color: var(--text-muted); font-size: 0.9rem;">Inventario por Voz y Central de Compras Colectiva · CREATIC Casanare</p>
-      </div>
-      <div style="display: flex; gap: 10px; align-items: center;">
-        <span class="badge">TRL 4-5 Prototipo</span>
-        <button id="airplaneBtn" class="mode-airplane" onclick="toggleAirplaneMode()">
-          ✈️ <span>Modo Conectado</span>
+
+  <div id="toast" class="toast">✅ Movimiento guardado</div>
+
+  <div class="app-shell">
+    <!-- CABECERA CÁLIDA DE ORIGO -->
+    <header class="app-header">
+      <div class="header-top">
+        <span class="brand-tag">🌾 ORIGO</span>
+        <button id="connPill" class="conn-pill" onclick="toggleAirplaneMode()">
+          <span id="connIcon">🟢</span>
+          <span id="connText">Conectado</span>
         </button>
       </div>
+      <div class="greeting">¡Hola, Don Pedro! ☀️</div>
+      <div class="store-sub">📍 Tienda La Esperanza · Comuna 2, Yopal</div>
     </header>
 
-    <div class="grid">
-      <!-- Columna Izquierda: Captura por Voz e Inventario Local -->
-      <div class="card">
-        <h2>🎙️ Registro por Voz (Offline-First)</h2>
-        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 14px;">
-          Toca el micrófono para dictar entradas o salidas con modismos de Casanare.
-        </p>
+    <!-- CONTENIDO PRINCIPAL -->
+    <main class="app-content">
 
-        <!-- Botón Grabador de Micrófono en Vivo -->
-        <div class="mic-container">
-          <button id="micBtn" class="btn-mic" onclick="toggleVoiceRecording()" title="Presiona para hablar">
-            🎙️
+      <!-- PESTAÑA 1: INICIO (VOZ + RESUMEN) -->
+      <section id="tab-home" class="tab-view active">
+        <div class="voice-hero">
+          <div class="voice-title">Registra con tu voz</div>
+          <div class="voice-hint">Sin teclados ni formularios. Funciona incluso sin internet.</div>
+
+          <div class="mic-wrapper">
+            <button id="micBtn" class="btn-mic-hero" onclick="toggleVoiceRecording()" aria-label="Presionar para hablar">
+              🎙️
+            </button>
+            <div id="micStatus" class="mic-status-text">Presiona para hablar</div>
+            <div id="micTranscript" class="mic-transcript-box"></div>
+          </div>
+
+          <div class="chips-label">Ejemplos con 1 toque:</div>
+          <div class="chips-grid">
+            <button class="quick-chip" onclick="setPhrase('venta de 5 bultos de arroz casanare')">📤 Venta 5 bultos arroz</button>
+            <button class="quick-chip" onclick="setPhrase('llegaron 10 bultos de cemento gris')">📥 Llegaron 10 cemento</button>
+            <button class="quick-chip" onclick="setPhrase('vendí dos y media arrobas de papa pastusa')">📤 2.5 arrobas papa</button>
+            <button class="quick-chip" onclick="setPhrase('venta de 4 cajas de aceite vegetal')">📤 4 cajas aceite</button>
+          </div>
+
+          <button class="manual-toggle-btn" onclick="toggleManualInput()">
+            ⌨️ O escribir manualmente
           </button>
-          <div id="micStatus" class="mic-status">Presiona el micrófono para hablar</div>
-          <div id="micTranscript" class="mic-transcript"></div>
-        </div>
-        
-        <div class="input-box">
-          <input type="text" id="voiceInput" placeholder='Ej: "vendí 3 arrobas de papa" o presiona el micrófono' value="">
-          <button class="btn-primary" onclick="processVoice()">Procesar</button>
-        </div>
 
-        <div class="quick-chips">
-          <span style="font-size: 0.8rem; color: var(--text-muted); align-self: center;">Ejemplos rápidos:</span>
-          <span class="chip" onclick="setPhrase('llegaron 20 bultos de arroz casanare')">📥 20 bultos arroz</span>
-          <span class="chip" onclick="setPhrase('vendí 3 arrobas de papa pastusa')">📤 3 arrobas papa</span>
-          <span class="chip" onclick="setPhrase('descargaron 10 bultos de cemento')">📥 10 cemento</span>
-          <span class="chip" onclick="setPhrase('vendí cuatro cajas de aceite vegetal')">📤 4 cajas aceite</span>
-        </div>
-
-        <div id="confirmCard" class="confirmation-card">
-          <h3 style="font-size: 1rem; color: #38bdf8; margin-bottom: 8px;">🔍 Confirmación de Movimiento:</h3>
-          <div id="confirmDetails" style="font-size: 0.9rem; line-height: 1.6; margin-bottom: 12px;"></div>
-          <div style="display: flex; gap: 10px;">
-            <button class="btn-primary" onclick="confirmMovement()">✔ Confirmar y Asentar</button>
-            <button style="background: #475569; color: white;" onclick="cancelMovement()">Descartar</button>
+          <div id="manualBox" class="manual-box">
+            <input type="text" id="voiceInput" class="manual-input" placeholder='Ej: "venta de 3 bultos de arroz"' onkeydown="if(event.key==='Enter') processVoice()">
+            <button class="btn-send" onclick="processVoice()">Enviar</button>
           </div>
         </div>
 
-        <h2 style="margin-top: 25px;">📊 Stock en Tiempo Real</h2>
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th>Stock</th>
-                <th>Mínimo</th>
-                <th>Estado</th>
-              </tr>
-            </thead>
-            <tbody id="stockTableBody">
-              <!-- Cargado dinámicamente -->
-            </tbody>
-          </table>
+        <!-- ALERTA DINÁMICA DE REPOSICIÓN -->
+        <div id="lowStockBanner" class="alert-banner">
+          <div id="lowStockText" class="alert-text">⚠️ Tienes productos bajos de inventario</div>
+          <button class="alert-cta" onclick="switchTab('community')">Pedir juntos →</button>
         </div>
-      </div>
 
-      <!-- Columna Derecha: Central de Compras Colectivas -->
-      <div class="card">
-        <h2>🤝 Central de Compras Colectivas</h2>
-        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">
-          Zona: <strong>Comuna 2 (Yopal, Casanare)</strong>. Agrupa necesidades de reposición para obtener precio mayorista y compartir flete.
-        </p>
+        <!-- INVENTARIO DE UN VISTAZO -->
+        <div class="section-head">
+          <div class="section-title">Tu inventario hoy</div>
+          <button class="section-link" onclick="switchTab('inventory')">Ver todo →</button>
+        </div>
+        <div id="homeStockList" class="stock-list">
+          <!-- Cargado dinámicamente -->
+        </div>
+      </section>
 
-        <button class="btn-accent" style="width: 100%; margin-bottom: 15px; padding: 12px;" onclick="simulateCollective()">
-          🔄 Agrupar Demanda con Tiendas Vecinas
+      <!-- PESTAÑA 2: BODEGA / INVENTARIO COMPLETO -->
+      <section id="tab-inventory" class="tab-view">
+        <div class="section-head">
+          <div class="section-title">📦 Mi Bodega</div>
+          <span id="pendingSyncTag" style="font-size: 0.82rem; font-weight: 700; color: var(--primary);">☁️ Al día</span>
+        </div>
+
+        <div id="categoryFilters" class="filter-scroll">
+          <button class="filter-pill active" onclick="filterCategory('Todos', this)">Todos</button>
+          <button class="filter-pill" onclick="filterCategory('Granos y Víveres', this)">Granos</button>
+          <button class="filter-pill" onclick="filterCategory('Víveres', this)">Víveres</button>
+          <button class="filter-pill" onclick="filterCategory('Perecederos', this)">Perecederos</button>
+          <button class="filter-pill" onclick="filterCategory('Agroinsumos', this)">Agroinsumos</button>
+          <button class="filter-pill" onclick="filterCategory('Ferretería', this)">Ferretería</button>
+        </div>
+
+        <div id="fullStockList" class="stock-list" style="margin-bottom: 24px;">
+          <!-- Cargado dinámicamente -->
+        </div>
+
+        <div class="section-head">
+          <div class="section-title">📜 Últimos movimientos</div>
+        </div>
+        <div id="historyList">
+          <!-- Historial Ledger -->
+        </div>
+      </section>
+
+      <!-- PESTAÑA 3: COMPRAS EN COMUNIDAD -->
+      <section id="tab-community" class="tab-view">
+        <div class="community-hero">
+          <h2>🤝 Juntos compramos más barato</h2>
+          <p>Unimos los pedidos de tu zona para comprar a precio de molino y repartir el costo del flete.</p>
+        </div>
+
+        <div class="progress-card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <strong style="font-size: 1rem;">🌾 Arroz Casanareño (50kg)</strong>
+            <span id="discountBadge" style="background: var(--primary-soft); color: var(--primary-text); padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 800;">16.2% Dcto</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div id="volumeBar" class="progress-bar-fill" style="width: 70%;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: var(--text-muted); font-weight: 700;">
+            <span id="volumeLabel">70 / 100 bultos reunidos</span>
+            <span id="storesBadge">4 tiendas</span>
+          </div>
+        </div>
+
+        <div class="savings-card">
+          <div style="font-weight: 900; color: #92400e; font-size: 1.05rem; margin-bottom: 12px;">
+            💰 Ahorro de la semana · Comuna 2
+          </div>
+          <div class="savings-row">
+            <span>Descuento por volumen mayorista:</span>
+            <strong id="commPriceSaving">$2.100.000 COP</strong>
+          </div>
+          <div class="savings-row">
+            <span>Ahorro en flete compartido:</span>
+            <strong id="commFreightSaving">$360.000 COP</strong>
+          </div>
+          <div class="savings-row">
+            <span>Flete por cada tienda:</span>
+            <strong id="commFreightEach">$30.000 COP</strong>
+          </div>
+          <div class="savings-total">
+            <span style="font-weight: 900; color: #78350f;">AHORRO TOTAL NETO:</span>
+            <span id="commTotalSaving" class="savings-total-val">$2.460.000</span>
+          </div>
+        </div>
+
+        <button id="joinOrderBtn" class="btn-join-community" onclick="joinCollectiveOrder()">
+          🤝 Sumar mi pedido a la compra semanal
         </button>
 
-        <div id="collectiveResult" class="collective-summary">
-          <div class="stat-row">
-            <span>Tiendas agrupadas en la zona:</span>
-            <strong id="storesCount">4 comercios</strong>
-          </div>
-          <div class="stat-row">
-            <span>Producto agrupado:</span>
-            <strong id="aggProduct">Arroz Casanareño (70 bultos)</strong>
-          </div>
-          <div class="stat-row">
-            <span>Ahorro en precio mayorista:</span>
-            <span style="color: #6ee7b7;" id="priceSaving">$2,100,000 COP</span>
-          </div>
-          <div class="stat-row">
-            <span>Ahorro en flete compartido:</span>
-            <span style="color: #6ee7b7;" id="freightSaving">$360,000 COP</span>
-          </div>
-          <hr style="border: 0; border-top: 1px solid #065f46; margin: 10px 0;">
-          <div class="stat-row">
-            <span style="font-size: 1.1rem; font-weight: bold;">AHORRO TOTAL NETO:</span>
-            <span class="stat-val-highlight" id="totalSaving">$2,460,000 COP</span>
-          </div>
+        <div class="section-head">
+          <div class="section-title">🏪 Vecinos en este pedido</div>
         </div>
+        <div id="neighborsList">
+          <!-- Lista de comercios -->
+        </div>
+      </section>
+    </main>
 
-        <div style="margin-top: 20px; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
-          💡 <strong>Efecto de Red Casanareño:</strong> Cada comercio que registra su inventario alimenta el cálculo de reposición colectiva, multiplicando el poder de negociación de las MiPymes frente a los grandes molinos de la región.
-        </div>
+    <!-- NAVEGACIÓN INFERIOR -->
+    <nav class="bottom-nav">
+      <button id="nav-home" class="nav-btn active" onclick="switchTab('home')">
+        <span class="nav-icon">🏠</span>
+        <span>Inicio</span>
+      </button>
+      <button id="nav-inventory" class="nav-btn" onclick="switchTab('inventory')">
+        <span class="nav-icon">📦</span>
+        <span>Bodega</span>
+      </button>
+      <button id="nav-community" class="nav-btn" onclick="switchTab('community')">
+        <span class="nav-icon">🤝</span>
+        <span>Comunidad</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- MODAL FLOTANTE DE CONFIRMACIÓN ANTI-ERRORES -->
+  <div id="confirmModal" class="modal-backdrop">
+    <div class="bottom-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">👂 ¿Lo entendí bien?</div>
+      <div class="sheet-sub">Puedes ajustar la cantidad con + o − antes de guardar</div>
+      <div id="receiptItemsContainer">
+        <!-- Tarjetas de recibo dinámicas -->
       </div>
+      <button class="btn-confirm-big" onclick="confirmMovement()">✔ Sí, es correcto (Guardar)</button>
+      <button class="btn-cancel-big" onclick="cancelMovement()">❌ Descartar o volver a hablar</button>
     </div>
   </div>
 
   <script>
+    const PRODUCT_ICONS = {
+      prod_arroz_casanare: '🌾',
+      prod_aceite_vegetal: '🛢️',
+      prod_panela_criolla: '🟫',
+      prod_papa_pastusa: '🥔',
+      prod_abono_triple15: '🌱',
+      prod_cemento_gris: '🧱',
+      prod_sal_marina: '🧂',
+      prod_harina_pan: '🌽'
+    };
+
     let isAirplaneMode = false;
     let pendingParsedItems = [];
+    let allStock = [];
+    let activeCategory = 'Todos';
     let recognition = null;
     let isRecording = false;
+    let joinedExtraBultos = 0;
 
-    // Soporte para Reconocimiento de Voz
+    // --- WEB SPEECH API ---
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let mediaStream = null;
 
     if (SpeechRecognition) {
       recognition = new SpeechRecognition();
-      recognition.lang = 'es-CO'; // Español de Colombia
+      recognition.lang = 'es-CO';
       recognition.continuous = false;
       recognition.interimResults = true;
 
       recognition.onstart = () => {
         isRecording = true;
-        const micBtn = document.getElementById('micBtn');
-        const micStatus = document.getElementById('micStatus');
-        const micTranscript = document.getElementById('micTranscript');
-        document.getElementById('voiceInput').value = ''; // Limpiar frase anterior
-        micBtn.classList.add('recording');
-        micStatus.classList.add('active');
-        micStatus.innerText = '🔴 Escuchando en vivo... Habla ahora';
-        micTranscript.innerText = 'Escuchando tu voz...';
+        document.getElementById('voiceInput').value = '';
+        document.getElementById('micBtn').classList.add('recording');
+        const status = document.getElementById('micStatus');
+        status.classList.remove('error');
+        status.innerText = '🔴 Escuchando... Habla ahora';
+        document.getElementById('micTranscript').innerText = 'Te estoy escuchando...';
       };
 
       recognition.onresult = (event) => {
@@ -216,169 +1103,325 @@
       };
 
       recognition.onerror = (event) => {
-        console.warn('Error en Speech Recognition:', event.error);
-        const micStatus = document.getElementById('micStatus');
-        const micTranscript = document.getElementById('micTranscript');
+        const status = document.getElementById('micStatus');
+        const transcript = document.getElementById('micTranscript');
+        status.classList.add('error');
         if (event.error === 'network') {
-          micStatus.innerText = '⚠️ Brave bloqueó el servicio de Google';
-          micTranscript.innerHTML = 'En Brave, activa <strong>"Use Google services for speech recognition"</strong> en <code>brave://settings/privacy</code> o abre en Google Chrome.';
+          status.innerText = '⚠️ Navegador bloqueó servicio de voz';
+          transcript.innerHTML = 'Usa <strong>Google Chrome</strong> para dictado web o toca los ejemplos rápidos de abajo.';
         } else if (event.error === 'not-allowed') {
-          micStatus.innerText = '⚠️ Permiso de micrófono denegado';
-          micTranscript.innerText = 'Haz clic en el icono de permisos a la izquierda de localhost:8000 y permite el micrófono.';
-        } else if (event.error === 'no-speech') {
-          micStatus.innerText = '⚠️ No se escuchó voz';
-          micTranscript.innerText = 'Vuelve a presionar el micrófono y habla claro y fuerte.';
+          status.innerText = '⚠️ Permiso de micrófono denegado';
+          transcript.innerText = 'Activa el permiso del micrófono en la barra de direcciones.';
         } else {
-          micStatus.innerText = `⚠️ Error: ${event.error}`;
+          status.innerText = '⚠️ No se detectó voz. Intenta de nuevo.';
+          transcript.innerText = '';
         }
       };
 
       recognition.onend = () => {
         isRecording = false;
-        const micBtn = document.getElementById('micBtn');
-        micBtn.classList.remove('recording');
+        document.getElementById('micBtn').classList.remove('recording');
         const text = document.getElementById('voiceInput').value;
         if (text && text.trim().length > 0) {
-          stopRecordingUI('✔ Audio recibido. Procesando...');
+          document.getElementById('micStatus').innerText = '✨ Entendido. Revisando...';
           setTimeout(() => {
             processVoice();
-            stopRecordingUI('Presiona el micrófono para hablar');
-          }, 350);
+            document.getElementById('micStatus').innerText = 'Presiona para hablar';
+          }, 300);
         }
       };
     }
 
-    function stopRecordingUI(message) {
-      const micBtn = document.getElementById('micBtn');
-      const micStatus = document.getElementById('micStatus');
-      micBtn.classList.remove('recording');
-      micStatus.classList.remove('active');
-      micStatus.innerText = message;
-    }
-
-    async function toggleVoiceRecording() {
-      // 1. Si el navegador soporta Web Speech API de forma nativa (Chrome, Edge, Chromium)
+    function toggleVoiceRecording() {
       if (recognition) {
         if (isRecording) {
           recognition.stop();
         } else {
-          try {
-            recognition.start();
-          } catch (err) {
-            console.error(err);
-          }
+          try { recognition.start(); } catch (e) { console.error(e); }
         }
         return;
       }
-
-      // 2. Si el navegador no tiene SpeechRecognition integrado (como Zen Browser / Firefox)
-      const micStatus = document.getElementById('micStatus');
-      const micTranscript = document.getElementById('micTranscript');
-      micStatus.classList.add('active');
-      micStatus.innerText = '⚠️ Zen Browser no traduce voz a texto';
-      micTranscript.innerHTML = 'Para dictado oral en vivo, abre <strong style="color:white;">http://localhost:8000</strong> en <strong>Google Chrome</strong> o <strong>Chromium</strong>. En Zen/Firefox escribe directamente o usa los botones rápidos.';
+      const status = document.getElementById('micStatus');
+      status.classList.add('error');
+      status.innerText = '⚠️ Tu navegador no transcribe voz web';
+      document.getElementById('micTranscript').innerHTML =
+        'Abre en <strong>Google Chrome</strong> o toca cualquiera de los botones rápidos abajo.';
     }
 
-    function toggleAirplaneMode() {
-      isAirplaneMode = !isAirplaneMode;
-      const btn = document.getElementById('airplaneBtn');
-      if (isAirplaneMode) {
-        btn.classList.add('active');
-        btn.innerHTML = '✈️ <span>Modo Avión (Desconectado)</span>';
-      } else {
-        btn.classList.remove('active');
-        btn.innerHTML = '🌐 <span>Modo Conectado</span>';
-        syncMovements();
+    function toggleManualInput() {
+      const box = document.getElementById('manualBox');
+      box.classList.toggle('open');
+      if (box.classList.contains('open')) {
+        document.getElementById('voiceInput').focus();
       }
     }
 
-    function setPhrase(p) {
-      document.getElementById('voiceInput').value = p;
+    function setPhrase(phrase) {
+      document.getElementById('voiceInput').value = phrase;
+      document.getElementById('micTranscript').innerText = `"${phrase}"`;
       processVoice();
     }
 
-    async function fetchStock() {
-      const res = await fetch('/api/stock');
-      const data = await res.json();
-      const tbody = document.getElementById('stockTableBody');
-      tbody.innerHTML = '';
-      data.forEach(item => {
-        const tr = document.createElement('tr');
-        const statusBadge = item.needs_reorder 
-          ? '<span class="tag-critical">⚠️ Reposición Urgente</span>'
-          : '<span class="tag-ok">✔ En Regla</span>';
-        tr.innerHTML = `
-          <td><strong>${item.product_name}</strong></td>
-          <td>${item.current_stock} ${item.unit}</td>
-          <td>${item.min_threshold}</td>
-          <td>${statusBadge}</td>
-        `;
-        tbody.appendChild(tr);
-      });
+    // --- NAVEGACIÓN ---
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-view').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+      document.getElementById(`tab-${tabName}`).classList.add('active');
+      document.getElementById(`nav-${tabName}`).classList.add('active');
+      if (tabName === 'inventory') fetchMovements();
+      if (tabName === 'community') loadCollectiveData();
     }
 
+    // --- MODO AVIÓN & SINCRONIZACIÓN ---
+    async function toggleAirplaneMode() {
+      isAirplaneMode = !isAirplaneMode;
+      const pill = document.getElementById('connPill');
+      const icon = document.getElementById('connIcon');
+      const text = document.getElementById('connText');
+
+      if (isAirplaneMode) {
+        pill.classList.add('offline');
+        icon.innerText = '✈️';
+        text.innerText = 'Sin Internet';
+        showToast('✈️ Modo Avión activo · Tus registros se guardan en el equipo');
+      } else {
+        pill.classList.remove('offline');
+        icon.innerText = '🟢';
+        text.innerText = 'Conectado';
+        const res = await fetch('/api/sync', { method: 'POST' });
+        const data = await res.json();
+        if (data.synced_count > 0) {
+          showToast(`☁️ ¡Señal recuperada! ${data.synced_count} movimientos sincronizados`);
+        } else {
+          showToast('🟢 Conectado · Inventario al día');
+        }
+        fetchStock();
+        fetchMovements();
+      }
+    }
+
+    // --- PROCESAMIENTO NLP & MODAL CONFIRMACIÓN ---
     async function processVoice() {
-      const phrase = document.getElementById('voiceInput').value;
+      const phrase = document.getElementById('voiceInput').value.trim();
       if (!phrase) return;
+
       const res = await fetch('/api/nlp/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phrase })
       });
       pendingParsedItems = await res.json();
-      
-      const confirmCard = document.getElementById('confirmCard');
-      const confirmDetails = document.getElementById('confirmDetails');
-      if (pendingParsedItems.length === 0) {
-        alert("No se identificó ningún producto del catálogo regional.");
-        confirmCard.style.display = 'none';
+
+      if (!pendingParsedItems || pendingParsedItems.length === 0) {
+        showToast('⚠️ No reconocí ese producto en tu catálogo');
         return;
       }
 
-      let html = '';
-      pendingParsedItems.forEach((it, i) => {
-        html += `<div><strong>${it.action === 'SALIDA' ? '📤 Salida / Venta' : '📥 Entrada'}:</strong> ${it.quantity} ${it.unit} de <em>${it.product_name}</em> (${Math.round(it.confidence * 100)}% certeza)</div>`;
+      renderConfirmationSheet();
+      document.getElementById('confirmModal').classList.add('open');
+    }
+
+    function renderConfirmationSheet() {
+      const container = document.getElementById('receiptItemsContainer');
+      container.innerHTML = '';
+
+      pendingParsedItems.forEach((item, idx) => {
+        const isOut = item.action === 'SALIDA';
+        const icon = PRODUCT_ICONS[item.product_id] || '📦';
+        const div = document.createElement('div');
+        div.className = 'receipt-item';
+        div.innerHTML = `
+          <div class="receipt-top">
+            <button class="action-toggle ${isOut ? 'out' : 'in'}" onclick="toggleItemAction(${idx})" title="Toca para cambiar entre Venta y Entrada">
+              ${isOut ? '📤 Venta realizada' : '📥 Mercancía recibida'} ⇄
+            </button>
+            <span class="certainty-badge">✨ ${Math.round(item.confidence * 100)}% Entendido</span>
+          </div>
+          <div class="receipt-prod">
+            <span>${icon}</span>
+            <span>${item.product_name}</span>
+          </div>
+          <div class="stepper-row">
+            <button class="btn-step" onclick="adjustQty(${idx}, -1)">−</button>
+            <span class="stepper-val">${item.quantity} ${item.unit}</span>
+            <button class="btn-step" onclick="adjustQty(${idx}, 1)">+</button>
+          </div>
+        `;
+        container.appendChild(div);
       });
-      confirmDetails.innerHTML = html;
-      confirmCard.style.display = 'block';
+    }
+
+    function adjustQty(idx, delta) {
+      const next = Math.max(0.5, Number((pendingParsedItems[idx].quantity + delta).toFixed(1)));
+      pendingParsedItems[idx].quantity = next;
+      renderConfirmationSheet();
+    }
+
+    function toggleItemAction(idx) {
+      pendingParsedItems[idx].action = pendingParsedItems[idx].action === 'SALIDA' ? 'ENTRADA' : 'SALIDA';
+      renderConfirmationSheet();
     }
 
     async function confirmMovement() {
-      if (!pendingParsedItems || pendingParsedItems.length === 0) return;
+      if (!pendingParsedItems.length) return;
       await fetch('/api/movements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items: pendingParsedItems, synced: !isAirplaneMode })
       });
-      document.getElementById('confirmCard').style.display = 'none';
-      fetchStock();
+      document.getElementById('confirmModal').classList.remove('open');
+      document.getElementById('voiceInput').value = '';
+      document.getElementById('micTranscript').innerText = '';
+      pendingParsedItems = [];
+
+      showToast(isAirplaneMode
+        ? '💾 Guardado en tu teléfono (se sincronizará al volver la señal)'
+        : '✅ ¡Guardado en tu inventario!');
+
+      await fetchStock();
+      await fetchMovements();
     }
 
     function cancelMovement() {
       pendingParsedItems = [];
-      document.getElementById('confirmCard').style.display = 'none';
+      document.getElementById('confirmModal').classList.remove('open');
     }
 
-    async function syncMovements() {
-      await fetch('/api/sync', { method: 'POST' });
-      fetchStock();
+    // --- INVENTARIO & HISTORIAL ---
+    async function fetchStock() {
+      const res = await fetch('/api/stock');
+      allStock = await res.json();
+      renderHomeStock();
+      renderFullStock();
     }
 
-    async function simulateCollective() {
+    function renderProductCard(item) {
+      const icon = PRODUCT_ICONS[item.product_id] || '📦';
+      const isLow = item.needs_reorder;
+      return `
+        <div class="product-card ${isLow ? 'critical' : ''}" onclick="setPhrase('venta de 1 ${item.unit} de ${item.product_name.toLowerCase()}')">
+          <div class="product-left">
+            <div class="product-icon">${icon}</div>
+            <div>
+              <div class="product-name">${item.product_name}</div>
+              <div class="product-meta">Mínimo: ${item.min_threshold} ${item.unit} · ${item.category}</div>
+            </div>
+          </div>
+          <div class="stock-pill ${isLow ? 'low' : 'ok'}">
+            ${isLow ? '⚠️ ' : '✔ '}${item.current_stock} ${item.unit}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderHomeStock() {
+      const lowItems = allStock.filter(i => i.needs_reorder);
+      const banner = document.getElementById('lowStockBanner');
+      if (lowItems.length > 0) {
+        banner.classList.add('visible');
+        document.getElementById('lowStockText').innerText =
+          lowItems.length === 1
+            ? `⚠️ Queda poco ${lowItems[0].product_name} (${lowItems[0].current_stock} ${lowItems[0].unit})`
+            : `⚠️ ${lowItems.length} productos necesitan reposición pronto`;
+      } else {
+        banner.classList.remove('visible');
+      }
+
+      // Mostrar primero los críticos y luego los primeros 4
+      const sorted = [...allStock].sort((a, b) => (b.needs_reorder ? 1 : 0) - (a.needs_reorder ? 1 : 0)).slice(0, 4);
+      document.getElementById('homeStockList').innerHTML = sorted.map(renderProductCard).join('');
+    }
+
+    function filterCategory(cat, btn) {
+      activeCategory = cat;
+      document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      renderFullStock();
+    }
+
+    function renderFullStock() {
+      const filtered = activeCategory === 'Todos'
+        ? allStock
+        : allStock.filter(i => i.category === activeCategory);
+      document.getElementById('fullStockList').innerHTML = filtered.map(renderProductCard).join('');
+    }
+
+    async function fetchMovements() {
+      const res = await fetch('/api/movements');
+      const moves = await res.json();
+      const pendingCount = moves.filter(m => !m.synced).length;
+      const syncTag = document.getElementById('pendingSyncTag');
+      if (pendingCount > 0) {
+        syncTag.innerText = `⏳ ${pendingCount} pendiente${pendingCount > 1 ? 's' : ''} local`;
+        syncTag.style.color = '#b45309';
+      } else {
+        syncTag.innerText = '☁️ Todo sincronizado';
+        syncTag.style.color = '#047857';
+      }
+
+      const container = document.getElementById('historyList');
+      container.innerHTML = moves.slice(0, 8).map(m => `
+        <div class="history-card">
+          <div>
+            <div style="font-weight: 800; font-size: 0.94rem;">
+              ${m.type === 'OUT' ? '📤 Venta' : '📥 Entrada'} · ${m.quantity} ${m.unit}
+            </div>
+            <div style="font-size: 0.84rem; color: var(--text-muted);">${m.product_name}</div>
+          </div>
+          <span class="sync-badge ${m.synced ? 'synced' : 'pending'}">
+            ${m.synced ? '☁️ Sync' : '⏳ Offline'}
+          </span>
+        </div>
+      `).join('');
+    }
+
+    // --- COMPRAS EN COMUNIDAD ---
+    async function loadCollectiveData() {
       const res = await fetch('/api/collective/simulate', { method: 'POST' });
       const data = await res.json();
-      document.getElementById('storesCount').innerText = `${data.participating_stores_count} comercios`;
-      if (data.products && data.products.length > 0) {
-        const p = data.products[0];
-        document.getElementById('aggProduct').innerText = `${p.product_name} (${p.total_quantity} ${p.unit})`;
-        document.getElementById('priceSaving').innerText = `$${p.savings_cop.toLocaleString('es-CO')} COP`;
-      }
-      document.getElementById('freightSaving').innerText = `$${data.freight_savings_cop.toLocaleString('es-CO')} COP`;
-      document.getElementById('totalSaving').innerText = `$${data.total_net_savings_cop.toLocaleString('es-CO')} COP`;
+      const prod = data.products[0];
+      const totalQty = prod.total_quantity + joinedExtraBultos;
+      const extraSavings = joinedExtraBultos * 30000;
+      const pct = Math.min(100, Math.round((totalQty / 100) * 100));
+
+      document.getElementById('volumeBar').style.width = `${pct}%`;
+      document.getElementById('volumeLabel').innerText = `${totalQty} / 100 bultos reunidos`;
+      document.getElementById('storesBadge').innerText = `${data.participating_stores_count} tiendas`;
+      document.getElementById('discountBadge').innerText = `${prod.discount_percentage}% Dcto`;
+      document.getElementById('commPriceSaving').innerText = `$${(prod.savings_cop + extraSavings).toLocaleString('es-CO')} COP`;
+      document.getElementById('commFreightSaving').innerText = `$${data.freight_savings_cop.toLocaleString('es-CO')} COP`;
+      document.getElementById('commFreightEach').innerText = `$${data.freight_per_store_cop.toLocaleString('es-CO')} COP`;
+      document.getElementById('commTotalSaving').innerText = `$${(data.total_net_savings_cop + extraSavings).toLocaleString('es-CO')}`;
+
+      document.getElementById('neighborsList').innerHTML = prod.contributions.map((c, idx) => {
+        const qty = idx === 0 ? c.quantity + joinedExtraBultos : c.quantity;
+        return `
+          <div class="neighbor-row">
+            <strong>🏪 ${c.business_name} ${idx === 0 ? '(Tú)' : ''}</strong>
+            <span style="font-weight: 800; color: var(--primary);">${qty} bultos</span>
+          </div>
+        `;
+      }).join('');
     }
 
-    // Inicializar carga de existencias
+    function joinCollectiveOrder() {
+      joinedExtraBultos += 10;
+      loadCollectiveData();
+      showToast('🎉 ¡Sumaste +10 bultos al pedido de la Comuna 2! Ahorro actualizado.');
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.classList.add('show');
+      clearTimeout(window._toastTimer);
+      window._toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+    }
+
+    // Inicializar aplicación
     fetchStock();
+    fetchMovements();
+    loadCollectiveData();
   </script>
 </body>
 </html>

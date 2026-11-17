@@ -77,6 +77,10 @@ class OrigoHandler(BaseHTTPRequestHandler):
         elif path == "/api/stock":
             stock = LEDGER.compute_stock(PARSER.catalog["products"])
             self._send_json(stock)
+        elif path == "/api/movements":
+            movements = [m.to_dict() for m in LEDGER.get_all_movements()]
+            movements.reverse()  # Más recientes primero
+            self._send_json(movements)
         elif path == "/api/catalog":
             self._send_json(PARSER.catalog)
         else:
