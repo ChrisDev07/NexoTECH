@@ -1,5 +1,5 @@
 """
-Libro Mayor Inmutable (Ledger) y Motor de Compras Colectivas para NexoLlano.
+Libro Mayor Inmutable (Ledger) y Motor de Compras Colectivas para Origo.
 Garantiza cero pérdida de información y consistencia matemática offline-first.
 """
 

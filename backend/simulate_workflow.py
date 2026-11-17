@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simulador de Flujo de Operación y Agrupación de Demanda - Proyecto NexoLlano
+Simulador de Flujo de Operación y Agrupación de Demanda - Proyecto Origo
 Validación de Entorno Operativo (TRL 4-5) · CREATIC Casanare
 Demuestra el ciclo de vida de inventario sin conexión y consolidación de compras.
 """
@@ -25,7 +25,7 @@ RESET = "\033[0m"
 
 def print_banner():
     print(f"\n{BOLD}{CYAN}===================================================================={RESET}")
-    print(f"{BOLD}{GREEN}           🌾 NEXOLLANO - PLATAFORMA DE OPERACIÓN MiPyME 🌾{RESET}")
+    print(f"{BOLD}{GREEN}           🌾 ORIGO - PLATAFORMA DE OPERACIÓN MiPyME 🌾{RESET}")
     print(f"{BOLD}    Inventario por Voz Offline y Central de Compras Colectiva{RESET}")
     print(f"{CYAN}===================================================================={RESET}\n")
 

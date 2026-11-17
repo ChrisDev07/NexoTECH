@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const NexoLlanoApp());
+  runApp(const OrigoApp());
 }
 
-class NexoLlanoApp extends StatelessWidget {
-  const NexoLlanoApp({super.key});
+class OrigoApp extends StatelessWidget {
+  const OrigoApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'NexoLlano',
+      title: 'Origo',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -41,7 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('🌾 NexoLlano Casanare', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text('🌾 Origo Casanare', style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: const Color(0xFF059669),
         foregroundColor: Colors.white,
         actions: [

@@ -1,5 +1,5 @@
 """
-Modelos de Datos para NexoLlano (CREATIC Casanare)
+Modelos de Datos para Origo (CREATIC Casanare)
 Arquitectura Event Sourcing / Ledger Inmutable y Compras Colectivas.
 """
 

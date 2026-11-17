@@ -1,4 +1,4 @@
-# Guion de Presentación Técnica e Institucional: NexoLlano 🌾📲
+# Guion de Presentación Técnica e Institucional: Origo 🌾📲
 **Convocatoria de Innovación Abierta CREATIC Casanare**  
 *Gobernación de Casanare – Dirección TIC / EON CASANARE S.A.S.*  
 **Tiempo estimado:** 4 a 5 minutos + 3 minutos de preguntas del comité evaluador.
@@ -16,9 +16,9 @@
 
 ---
 
-## ⏱️ Minuto 0:45 - 1:45 | La Solución: NexoLlano
+## ⏱️ Minuto 0:45 - 1:45 | La Solución: Origo
 
-> *"Por eso creamos **NexoLlano**: la primera plataforma diseñada para unir el **inventario por voz sin internet** con una **central de compras colectiva** exclusiva para las MiPymes casanareñas.*  
+> *"Por eso creamos **Origo**: la primera plataforma diseñada para unir el **inventario por voz sin internet** con una **central de compras colectiva** exclusiva para las MiPymes casanareñas.*  
 >  
 > *Nuestro sistema resuelve el problema en dos pasos:*  
 > 1. **Inventario por voz 100% offline:** El tendero no digita nada. Oprime un botón y habla naturalmente: *'Llegaron veinte bultos de arroz casanareño y cinco de sal'*. Nuestro motor procesa el audio dentro del propio celular, comprende las unidades llaneras como bultos, arrobas, pacas o cargas, y le muestra una tarjeta de confirmación en pantalla.  
@@ -51,11 +51,11 @@
 
 ## ⏱️ Minuto 3:15 - 4:15 | Seguridad, Sostenibilidad y TRL 4-5
 
-> *"NexoLlano cumple estrictamente con la **Ley 1581 de 2012** (Habeas Data Colombia), minimizando datos personales y protegiendo la información con cifrado TLS 1.2+.*  
+> *"Origo cumple estrictamente con la **Ley 1581 de 2012** (Habeas Data Colombia), minimizando datos personales y protegiendo la información con cifrado TLS 1.2+.*  
 > *Para los comerciantes, la aplicación de inventario es y seguirá siendo **gratuita**, asegurando cero fricción en la adopción.*  
 > *La sostenibilidad se fundamenta en convenios por volumen con los molinos y distribuidores aliados, y en la articulación con la Dirección TIC de la Gobernación de Casanare.*  
 >  
-> *Señores del jurado: NexoLlano transforma el comercio tradicional de Casanare desde la voz del comerciante hasta la economía colaborativa del departamento. Muchas gracias."*
+> *Señores del jurado: Origo transforma el comercio tradicional de Casanare desde la voz del comerciante hasta la economía colaborativa del departamento. Muchas gracias."*
 
 ---
 
@@ -65,7 +65,7 @@
 > *Todo el motor de transcripción y el intérprete NLP de reglas heurísticas corren de forma nativa en el dispositivo. No enviamos audio a la nube (ahorrando datos móviles y batería). Los movimientos se almacenan en una base de datos local SQLite tipo libro mayor inmutable y se sincronizan automáticamente cuando el comerciante tiene señal o llega a su casa con Wi-Fi.*
 
 ### 2. ¿Qué pasa si hay mucho ruido en la tienda o música de fondo?
-> *Por diseño de usabilidad, NexoLlano incluye una **pantalla de confirmación obligatoria** de un solo toque. El usuario ve exactamente lo entendido y puede ajustar la cantidad con un simple selector antes de que el movimiento se guarde.*
+> *Por diseño de usabilidad, Origo incluye una **pantalla de confirmación obligatoria** de un solo toque. El usuario ve exactamente lo entendido y puede ajustar la cantidad con un simple selector antes de que el movimiento se guarde.*
 
 ### 3. ¿Cómo manejan los conflictos si dos dispositivos registran inventario sin internet?
 > *Implementamos el patrón **Event Sourcing / Ledger**. No modificamos un campo de 'stock total' directamente, sino que cada transacción es un registro de entrada o salida con UUID único y marca de tiempo UTC. Al sincronizar con el servidor, las operaciones se integran en orden sin sobreescribir ni perder transacciones.*

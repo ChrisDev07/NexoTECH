@@ -1,5 +1,5 @@
 """
-Motor NLP Heurístico de Voz para NexoLlano (CREATIC Casanare)
+Motor NLP Heurístico de Voz para Origo (CREATIC Casanare)
 Procesa lenguaje natural oral de comerciantes de Casanare sin conexión a internet.
 Extrae intenciones, cantidades, unidades y busca productos con coincidencia difusa (Fuzzy Matching).
 """

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Servidor API REST y Simulador Web para NexoLlano.
+Servidor API REST y Simulador Web para Origo.
 Funciona 100% con la librería estándar de Python (sin requerir dependencias externas).
 """
 
@@ -40,7 +40,7 @@ def seed_demo_data():
 
 seed_demo_data()
 
-class NexoLlanoHandler(BaseHTTPRequestHandler):
+class OrigoHandler(BaseHTTPRequestHandler):
     def _send_json(self, data, status=200):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -139,8 +139,8 @@ class NexoLlanoHandler(BaseHTTPRequestHandler):
 
 def run(port=8000):
     server_address = ('', port)
-    httpd = HTTPServer(server_address, NexoLlanoHandler)
-    print(f"🚀 Servidor NexoLlano activo en http://localhost:{port}")
+    httpd = HTTPServer(server_address, OrigoHandler)
+    print(f"🚀 Servidor Origo activo en http://localhost:{port}")
     httpd.serve_forever()
 
 if __name__ == "__main__":
