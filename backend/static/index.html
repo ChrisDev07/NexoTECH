@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NexoLlano - Demo CREATIC Casanare</title>
+  <title>NexoLlano - Plataforma de Operación MiPyME</title>
   <style>
     :root {
       --primary: #059669;
@@ -20,33 +20,48 @@
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; }
     .container { max-width: 1100px; margin: 0 auto; }
-    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 25px; }
+    header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
     .badge { background: #065f46; color: #a7f3d0; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
-    .mode-airplane { background: #374151; color: #e5e7eb; padding: 6px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); }
+    .mode-airplane { background: #374151; color: #e5e7eb; padding: 8px 14px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; border: 1px solid var(--border); font-weight: 500; font-size: 0.9rem; }
     .mode-airplane.active { background: #b45309; border-color: #f59e0b; color: white; }
     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
-    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); }
-    h2 { font-size: 1.2rem; margin-bottom: 15px; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+    @media (max-width: 820px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 22px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2); }
+    h2 { font-size: 1.25rem; margin-bottom: 15px; color: #38bdf8; display: flex; align-items: center; gap: 8px; }
+    
+    /* Mic Control */
+    .mic-container { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 10px; background: #0b1329; border: 2px dashed #334155; border-radius: 12px; margin-bottom: 18px; text-align: center; }
+    .btn-mic { width: 84px; height: 84px; border-radius: 50%; border: none; background: #059669; color: white; font-size: 2.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4); transition: all 0.2s ease-in-out; }
+    .btn-mic:hover { transform: scale(1.05); background: #047857; }
+    .btn-mic.recording { background: #dc2626; box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); animation: pulse-ring 1.4s infinite cubic-bezier(0.66, 0, 0, 1); }
+    @keyframes pulse-ring {
+      0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+      70% { box-shadow: 0 0 0 18px rgba(220, 38, 38, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+    }
+    .mic-status { margin-top: 12px; font-size: 0.95rem; font-weight: 600; color: #94a3b8; }
+    .mic-status.active { color: #f87171; }
+    .mic-transcript { margin-top: 8px; font-size: 0.88rem; color: #38bdf8; min-height: 20px; font-style: italic; }
+
     .input-box { display: flex; gap: 10px; margin-bottom: 15px; }
     input[type="text"] { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); background: #0f172a; color: white; font-size: 0.95rem; }
     button { padding: 10px 18px; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; }
     .btn-primary { background: var(--primary); color: white; }
     .btn-primary:hover { background: var(--primary-dark); }
-    .btn-accent { background: var(--accent); color: #000; }
+    .btn-accent { background: var(--accent); color: #000; font-size: 0.95rem; }
     .quick-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 15px; }
-    .chip { background: #334155; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
-    .chip:hover { background: #475569; }
-    .table-container { overflow-x: auto; }
+    .chip { background: #334155; padding: 6px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; border: 1px solid #475569; }
+    .chip:hover { background: #475569; border-color: #64748b; }
+    .table-container { overflow-x: auto; margin-top: 10px; }
     table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
     th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); }
     th { color: var(--text-muted); font-weight: 600; }
-    .tag-critical { background: #7f1d1d; color: #fecaca; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
-    .tag-ok { background: #064e3b; color: #a7f3d0; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
-    .confirmation-card { background: #0f172a; border: 2px solid #0284c7; border-radius: 8px; padding: 15px; margin-top: 15px; display: none; }
-    .collective-summary { background: #132e2b; border: 1px solid #10b981; border-radius: 8px; padding: 16px; margin-top: 15px; }
+    .tag-critical { background: #7f1d1d; color: #fecaca; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: bold; }
+    .tag-ok { background: #064e3b; color: #a7f3d0; padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; }
+    .confirmation-card { background: #0f172a; border: 2px solid #0284c7; border-radius: 8px; padding: 16px; margin-top: 15px; display: none; }
+    .collective-summary { background: #132e2b; border: 1px solid #10b981; border-radius: 8px; padding: 18px; margin-top: 15px; }
     .stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
-    .stat-val-highlight { color: #34d399; font-weight: bold; font-size: 1.2rem; }
+    .stat-val-highlight { color: #34d399; font-weight: bold; font-size: 1.25rem; }
   </style>
 </head>
 <body>
@@ -65,18 +80,29 @@
     </header>
 
     <div class="grid">
-      <!-- Columna Izquierda: Dictado por Voz e Inventario Local -->
+      <!-- Columna Izquierda: Captura por Voz e Inventario Local -->
       <div class="card">
-        <h2>🎙️ Registro por Voz (Offline)</h2>
-        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">Dicta en lenguaje coloquial llanero. Funciona 100% sin internet.</p>
+        <h2>🎙️ Registro por Voz (Offline-First)</h2>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 14px;">
+          Toca el micrófono para dictar entradas o salidas con modismos de Casanare.
+        </p>
+
+        <!-- Botón Grabador de Micrófono en Vivo -->
+        <div class="mic-container">
+          <button id="micBtn" class="btn-mic" onclick="toggleVoiceRecording()" title="Presiona para hablar">
+            🎙️
+          </button>
+          <div id="micStatus" class="mic-status">Presiona el micrófono para hablar</div>
+          <div id="micTranscript" class="mic-transcript"></div>
+        </div>
         
         <div class="input-box">
-          <input type="text" id="voiceInput" placeholder='Ej: "vendí 5 bultos de arroz casanare"' value="vendí 15 bultos de arroz casanare y 5 de sal">
+          <input type="text" id="voiceInput" placeholder='O escribe aquí: "vendí 5 bultos de arroz casanare"' value="vendí 15 bultos de arroz casanare y 5 de sal">
           <button class="btn-primary" onclick="processVoice()">Procesar</button>
         </div>
 
         <div class="quick-chips">
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Frases rápidas:</span>
+          <span style="font-size: 0.8rem; color: var(--text-muted); align-self: center;">Ejemplos rápidos:</span>
           <span class="chip" onclick="setPhrase('llegaron 20 bultos de arroz casanare')">📥 20 bultos arroz</span>
           <span class="chip" onclick="setPhrase('vendí 3 arrobas de papa pastusa')">📤 3 arrobas papa</span>
           <span class="chip" onclick="setPhrase('descargaron 10 bultos de cemento')">📥 10 cemento</span>
@@ -85,7 +111,7 @@
 
         <div id="confirmCard" class="confirmation-card">
           <h3 style="font-size: 1rem; color: #38bdf8; margin-bottom: 8px;">🔍 Confirmación de Movimiento:</h3>
-          <div id="confirmDetails" style="font-size: 0.9rem; line-height: 1.5; margin-bottom: 12px;"></div>
+          <div id="confirmDetails" style="font-size: 0.9rem; line-height: 1.6; margin-bottom: 12px;"></div>
           <div style="display: flex; gap: 10px;">
             <button class="btn-primary" onclick="confirmMovement()">✔ Confirmar y Asentar</button>
             <button style="background: #475569; color: white;" onclick="cancelMovement()">Descartar</button>
@@ -117,7 +143,7 @@
           Zona: <strong>Comuna 2 (Yopal, Casanare)</strong>. Agrupa necesidades de reposición para obtener precio mayorista y compartir flete.
         </p>
 
-        <button class="btn-accent" style="width: 100%; margin-bottom: 15px;" onclick="simulateCollective()">
+        <button class="btn-accent" style="width: 100%; margin-bottom: 15px; padding: 12px;" onclick="simulateCollective()">
           🔄 Agrupar Demanda con Tiendas Vecinas
         </button>
 
@@ -145,8 +171,8 @@
           </div>
         </div>
 
-        <div style="margin-top: 20px; font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">
-          💡 <strong>Efecto de Red Casanareño:</strong> Cada tienda nueva en la comuna incrementa el volumen de compra, activando escalas de mayoristas en molinos y transportadores regionales.
+        <div style="margin-top: 20px; font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+          💡 <strong>Efecto de Red Casanareño:</strong> Cada comercio que registra su inventario alimenta el cálculo de reposición colectiva, multiplicando el poder de negociación de las MiPymes frente a los grandes molinos de la región.
         </div>
       </div>
     </div>
@@ -155,6 +181,82 @@
   <script>
     let isAirplaneMode = false;
     let pendingParsedItems = [];
+    let recognition = null;
+    let isRecording = false;
+
+    // Configuración de Reconocimiento de Voz Web (Web Speech API)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.lang = 'es-CO'; // Español de Colombia
+      recognition.continuous = false;
+      recognition.interimResults = true;
+
+      recognition.onstart = () => {
+        isRecording = true;
+        const micBtn = document.getElementById('micBtn');
+        const micStatus = document.getElementById('micStatus');
+        const micTranscript = document.getElementById('micTranscript');
+        micBtn.classList.add('recording');
+        micStatus.classList.add('active');
+        micStatus.innerText = '🔴 Escuchando... Habla ahora';
+        micTranscript.innerText = '';
+      };
+
+      recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          transcript += event.results[i][0].transcript;
+        }
+        document.getElementById('micTranscript').innerText = `"${transcript}"`;
+        document.getElementById('voiceInput').value = transcript;
+      };
+
+      recognition.onerror = (event) => {
+        console.warn('Error en Speech Recognition:', event.error);
+        stopRecordingUI('⚠️ Error o micrófono no permitido');
+      };
+
+      recognition.onend = () => {
+        isRecording = false;
+        stopRecordingUI('✔ Procesando audio...');
+        // Procesar automáticamente al terminar de hablar
+        const text = document.getElementById('voiceInput').value;
+        if (text && text.trim().length > 0) {
+          setTimeout(() => {
+            processVoice();
+            stopRecordingUI('Presiona el micrófono para hablar');
+          }, 400);
+        } else {
+          stopRecordingUI('Presiona el micrófono para hablar');
+        }
+      };
+    }
+
+    function stopRecordingUI(message) {
+      const micBtn = document.getElementById('micBtn');
+      const micStatus = document.getElementById('micStatus');
+      micBtn.classList.remove('recording');
+      micStatus.classList.remove('active');
+      micStatus.innerText = message;
+    }
+
+    function toggleVoiceRecording() {
+      if (!recognition) {
+        alert("Tu navegador no soporta Web Speech API de forma nativa o necesitas habilitar permisos de micrófono. Puedes usar el campo de texto o los botones rápidos.");
+        return;
+      }
+      if (isRecording) {
+        recognition.stop();
+      } else {
+        try {
+          recognition.start();
+        } catch (err) {
+          console.error(err);
+        }
+      }
+    }
 
     function toggleAirplaneMode() {
       isAirplaneMode = !isAirplaneMode;
@@ -214,7 +316,7 @@
 
       let html = '';
       pendingParsedItems.forEach((it, i) => {
-        html += `<div><strong>${it.action === 'SALIDA' ? '📤 Venta / Salida' : '📥 Entrada'}:</strong> ${it.quantity} ${it.unit} de <em>${it.product_name}</em> (${Math.round(it.confidence * 100)}% certeza)</div>`;
+        html += `<div><strong>${it.action === 'SALIDA' ? '📤 Salida / Venta' : '📥 Entrada'}:</strong> ${it.quantity} ${it.unit} de <em>${it.product_name}</em> (${Math.round(it.confidence * 100)}% certeza)</div>`;
       });
       confirmDetails.innerHTML = html;
       confirmCard.style.display = 'block';
@@ -254,7 +356,7 @@
       document.getElementById('totalSaving').innerText = `$${data.total_net_savings_cop.toLocaleString('es-CO')} COP`;
     }
 
-    // Inicializar
+    // Inicializar carga de existencias
     fetchStock();
   </script>
 </body>
