@@ -3,6 +3,7 @@ Pruebas del Ledger Inmutable y Central de Compras Colectivas.
 """
 
 import unittest
+from datetime import datetime, date
 from ledger import LocalLedger, CollectivePurchasingEngine
 from models import Movement
 
@@ -56,6 +57,43 @@ class TestLedgerAndCollective(unittest.TestCase):
         stock2 = self.ledger.compute_stock(self.catalog)
         self.assertEqual(stock2[0]["current_stock"], 8.0)
         self.assertTrue(stock2[0]["needs_reorder"])
+
+    def test_daily_stock_window_00_to_2359(self):
+        target = date(2026, 11, 17)
+        yesterday_ts = datetime(2026, 11, 16, 22, 0, 0).timestamp()
+        morning_ts = datetime(2026, 11, 17, 0, 0, 0).timestamp()
+        night_ts = datetime(2026, 11, 17, 23, 59, 59).timestamp()
+        tomorrow_ts = datetime(2026, 11, 18, 0, 0, 1).timestamp()
+
+        # Saldo ayer (antes de 00:00): +20
+        self.ledger.record_movement(Movement.from_dict({
+            "product_id": "prod_arroz_casanare", "type": "IN", "quantity": 20, "unit": "bultos", "timestamp": yesterday_ts
+        }))
+        # Hoy 00:00:00: +5 entrada
+        self.ledger.record_movement(Movement.from_dict({
+            "product_id": "prod_arroz_casanare", "type": "IN", "quantity": 5, "unit": "bultos", "timestamp": morning_ts
+        }))
+        # Hoy 23:59:59: -8 salida
+        self.ledger.record_movement(Movement.from_dict({
+            "product_id": "prod_arroz_casanare", "type": "OUT", "quantity": 8, "unit": "bultos", "timestamp": night_ts
+        }))
+        # Mañana 00:00:01: -10 (NO debe entrar en el corte de hoy)
+        self.ledger.record_movement(Movement.from_dict({
+            "product_id": "prod_arroz_casanare", "type": "OUT", "quantity": 10, "unit": "bultos", "timestamp": tomorrow_ts
+        }))
+
+        daily = self.ledger.compute_daily_stock(self.catalog, target_date=target)
+        self.assertEqual(daily["window"], "00:00 - 23:59")
+        self.assertEqual(daily["summary"]["total_in_today"], 5.0)
+        self.assertEqual(daily["summary"]["total_out_today"], 8.0)
+        self.assertEqual(daily["summary"]["movements_count_today"], 2)
+
+        item = daily["items"][0]
+        self.assertEqual(item["opening_stock"], 20.0)
+        self.assertEqual(item["today_in"], 5.0)
+        self.assertEqual(item["today_out"], 8.0)
+        self.assertEqual(item["current_stock"], 17.0)
+        self.assertTrue(item["has_activity_today"])
 
     def test_collective_order_aggregation(self):
         engine = CollectivePurchasingEngine(freight_cost_cop=120000)

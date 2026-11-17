@@ -7,6 +7,8 @@ Funciona 100% con la librería estándar de Python (sin requerir dependencias ex
 import sys
 import os
 import json
+import time
+from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse
 
@@ -23,17 +25,24 @@ PARSER = RegionalNLPParser()
 LEDGER = LocalLedger(":memory:")
 COLLECTIVE_ENGINE = CollectivePurchasingEngine(freight_cost_cop=120000.0)
 
-# Precargar inventario inicial para demostración
+# Precargar saldo inicial (antes de 00:00) y movimientos de muestra del día
 def seed_demo_data():
+    now = datetime.now()
+    start_of_today = datetime(now.year, now.month, now.day, 0, 0, 0).timestamp()
+    opening_ts = start_of_today - 3600  # Cierre de ayer = Saldo inicial de hoy 00:00
+
     init_movements = [
-        {"product_id": "prod_arroz_casanare", "product_name": "Arroz Casanareño", "type": "IN", "quantity": 20, "unit": "bultos"},
-        {"product_id": "prod_aceite_vegetal", "product_name": "Aceite Vegetal 900ml", "type": "IN", "quantity": 10, "unit": "cajas"},
-        {"product_id": "prod_sal_marina", "product_name": "Sal Marina Refinada", "type": "IN", "quantity": 8, "unit": "bultos"},
-        {"product_id": "prod_panela_criolla", "product_name": "Panela Criolla", "type": "IN", "quantity": 15, "unit": "pacas"},
-        {"product_id": "prod_papa_pastusa", "product_name": "Papa Pastusa / Criolla", "type": "IN", "quantity": 12, "unit": "arrobas"},
-        {"product_id": "prod_abono_triple15", "product_name": "Abono Triple 15", "type": "IN", "quantity": 15, "unit": "bultos"},
-        {"product_id": "prod_cemento_gris", "product_name": "Cemento Gris 50kg", "type": "IN", "quantity": 30, "unit": "bultos"},
-        {"product_id": "prod_harina_pan", "product_name": "Harina de Maíz Precocida", "type": "IN", "quantity": 12, "unit": "pacas"}
+        {"product_id": "prod_arroz_casanare", "product_name": "Arroz Casanareño", "type": "IN", "quantity": 20, "unit": "bultos", "timestamp": opening_ts},
+        {"product_id": "prod_aceite_vegetal", "product_name": "Aceite Vegetal 900ml", "type": "IN", "quantity": 10, "unit": "cajas", "timestamp": opening_ts},
+        {"product_id": "prod_sal_marina", "product_name": "Sal Marina Refinada", "type": "IN", "quantity": 8, "unit": "bultos", "timestamp": opening_ts},
+        {"product_id": "prod_panela_criolla", "product_name": "Panela Criolla", "type": "IN", "quantity": 15, "unit": "pacas", "timestamp": opening_ts},
+        {"product_id": "prod_papa_pastusa", "product_name": "Papa Pastusa / Criolla", "type": "IN", "quantity": 12, "unit": "arrobas", "timestamp": opening_ts},
+        {"product_id": "prod_abono_triple15", "product_name": "Abono Triple 15", "type": "IN", "quantity": 15, "unit": "bultos", "timestamp": opening_ts},
+        {"product_id": "prod_cemento_gris", "product_name": "Cemento Gris 50kg", "type": "IN", "quantity": 30, "unit": "bultos", "timestamp": opening_ts},
+        {"product_id": "prod_harina_pan", "product_name": "Harina de Maíz Precocida", "type": "IN", "quantity": 12, "unit": "pacas", "timestamp": opening_ts},
+        # Movimientos de ejemplo ocurridos hoy (dentro de la ventana 00:00 - 23:59)
+        {"product_id": "prod_arroz_casanare", "product_name": "Arroz Casanareño", "type": "OUT", "quantity": 5, "unit": "bultos", "timestamp": max(start_of_today + 60, time.time() - 1800)},
+        {"product_id": "prod_papa_pastusa", "product_name": "Papa Pastusa / Criolla", "type": "OUT", "quantity": 4, "unit": "arrobas", "timestamp": max(start_of_today + 120, time.time() - 900)}
     ]
     for m in init_movements:
         LEDGER.record_movement(Movement.from_dict({**m, "synced": True}))
@@ -77,8 +86,20 @@ class OrigoHandler(BaseHTTPRequestHandler):
         elif path == "/api/stock":
             stock = LEDGER.compute_stock(PARSER.catalog["products"])
             self._send_json(stock)
+        elif path == "/api/stock/daily":
+            daily = LEDGER.compute_daily_stock(PARSER.catalog["products"])
+            self._send_json(daily)
         elif path == "/api/movements":
-            movements = [m.to_dict() for m in LEDGER.get_all_movements()]
+            now = datetime.now()
+            start_ts = datetime(now.year, now.month, now.day, 0, 0, 0).timestamp()
+            end_ts = datetime(now.year, now.month, now.day, 23, 59, 59, 999999).timestamp()
+            movements = []
+            for m in LEDGER.get_all_movements():
+                d = m.to_dict()
+                is_today = start_ts <= m.timestamp <= end_ts
+                d["is_today"] = is_today
+                d["time_str"] = datetime.fromtimestamp(m.timestamp).strftime("%H:%M") if is_today else "Saldo 00:00"
+                movements.append(d)
             movements.reverse()  # Más recientes primero
             self._send_json(movements)
         elif path == "/api/catalog":

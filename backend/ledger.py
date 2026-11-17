@@ -8,6 +8,7 @@ import json
 import os
 import uuid
 import time
+from datetime import datetime, date
 from typing import List, Dict, Any, Optional
 from models import Movement, StockItem
 
@@ -92,6 +93,96 @@ class LocalLedger:
                 "wholesale_price_cop": prod.get("wholesale_price_cop", 0)
             })
         return result
+
+    def compute_daily_stock(
+        self,
+        catalog: List[Dict[str, Any]],
+        business_id: str = "tienda_demo",
+        target_date: Optional[date] = None
+    ) -> Dict[str, Any]:
+        """
+        Calcula el inventario del día en la ventana exacta de 00:00:00 a 23:59:59.
+        Separa el saldo inicial (antes de 00:00) de las entradas y salidas del día.
+        """
+        d = target_date or datetime.now().date()
+        start_ts = datetime(d.year, d.month, d.day, 0, 0, 0).timestamp()
+        end_ts = datetime(d.year, d.month, d.day, 23, 59, 59, 999999).timestamp()
+
+        movements = self.get_all_movements(business_id=business_id)
+        opening_map: Dict[str, float] = {}
+        today_in_map: Dict[str, float] = {}
+        today_out_map: Dict[str, float] = {}
+        today_count_map: Dict[str, int] = {}
+        last_ts_map: Dict[str, float] = {}
+
+        total_in_today = 0.0
+        total_out_today = 0.0
+        total_movements_today = 0
+
+        for m in movements:
+            pid = m.product_id
+            if m.timestamp < start_ts:
+                delta = m.quantity if m.type == "IN" else -m.quantity
+                opening_map[pid] = opening_map.get(pid, 0.0) + delta
+            elif start_ts <= m.timestamp <= end_ts:
+                total_movements_today += 1
+                today_count_map[pid] = today_count_map.get(pid, 0) + 1
+                if pid not in last_ts_map or m.timestamp > last_ts_map[pid]:
+                    last_ts_map[pid] = m.timestamp
+                if m.type == "IN":
+                    today_in_map[pid] = today_in_map.get(pid, 0.0) + m.quantity
+                    total_in_today += m.quantity
+                elif m.type == "OUT":
+                    today_out_map[pid] = today_out_map.get(pid, 0.0) + m.quantity
+                    total_out_today += m.quantity
+
+        items = []
+        critical_count = 0
+        for prod in catalog:
+            pid = prod["id"]
+            opening_qty = round(opening_map.get(pid, 0.0), 2)
+            in_today = round(today_in_map.get(pid, 0.0), 2)
+            out_today = round(today_out_map.get(pid, 0.0), 2)
+            current_qty = round(opening_qty + in_today - out_today, 2)
+            threshold = prod.get("min_threshold", 5)
+            needs_reorder = current_qty <= threshold
+            if needs_reorder:
+                critical_count += 1
+
+            last_time_str = None
+            if pid in last_ts_map:
+                last_time_str = datetime.fromtimestamp(last_ts_map[pid]).strftime("%H:%M")
+
+            items.append({
+                "product_id": pid,
+                "product_name": prod["name"],
+                "category": prod.get("category", "General"),
+                "opening_stock": opening_qty,
+                "today_in": in_today,
+                "today_out": out_today,
+                "daily_net": round(in_today - out_today, 2),
+                "current_stock": current_qty,
+                "has_activity_today": today_count_map.get(pid, 0) > 0,
+                "today_movements_count": today_count_map.get(pid, 0),
+                "last_movement_time": last_time_str,
+                "unit": prod.get("default_unit", "unidades"),
+                "min_threshold": threshold,
+                "needs_reorder": needs_reorder,
+                "retail_price_cop": prod.get("retail_price_cop", 0),
+                "wholesale_price_cop": prod.get("wholesale_price_cop", 0)
+            })
+
+        return {
+            "date": d.isoformat(),
+            "window": "00:00 - 23:59",
+            "summary": {
+                "total_in_today": round(total_in_today, 2),
+                "total_out_today": round(total_out_today, 2),
+                "movements_count_today": total_movements_today,
+                "critical_products_count": critical_count
+            },
+            "items": items
+        }
 
     def get_pending_sync_movements(self) -> List[Movement]:
         cursor = self.conn.cursor()
