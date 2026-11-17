@@ -97,7 +97,7 @@
         </div>
         
         <div class="input-box">
-          <input type="text" id="voiceInput" placeholder='O escribe aquí: "vendí 5 bultos de arroz casanare"' value="vendí 15 bultos de arroz casanare y 5 de sal">
+          <input type="text" id="voiceInput" placeholder='Ej: "vendí 3 arrobas de papa" o presiona el micrófono' value="">
           <button class="btn-primary" onclick="processVoice()">Procesar</button>
         </div>
 
@@ -199,10 +199,11 @@
         const micBtn = document.getElementById('micBtn');
         const micStatus = document.getElementById('micStatus');
         const micTranscript = document.getElementById('micTranscript');
+        document.getElementById('voiceInput').value = ''; // Limpiar frase anterior
         micBtn.classList.add('recording');
         micStatus.classList.add('active');
         micStatus.innerText = '🔴 Escuchando en vivo... Habla ahora';
-        micTranscript.innerText = '';
+        micTranscript.innerText = 'Escuchando tu voz...';
       };
 
       recognition.onresult = (event) => {
@@ -216,20 +217,33 @@
 
       recognition.onerror = (event) => {
         console.warn('Error en Speech Recognition:', event.error);
-        stopRecordingUI('⚠️ Micrófono en pausa');
+        const micStatus = document.getElementById('micStatus');
+        const micTranscript = document.getElementById('micTranscript');
+        if (event.error === 'network') {
+          micStatus.innerText = '⚠️ Brave bloqueó el servicio de Google';
+          micTranscript.innerHTML = 'En Brave, activa <strong>"Use Google services for speech recognition"</strong> en <code>brave://settings/privacy</code> o abre en Google Chrome.';
+        } else if (event.error === 'not-allowed') {
+          micStatus.innerText = '⚠️ Permiso de micrófono denegado';
+          micTranscript.innerText = 'Haz clic en el icono de permisos a la izquierda de localhost:8000 y permite el micrófono.';
+        } else if (event.error === 'no-speech') {
+          micStatus.innerText = '⚠️ No se escuchó voz';
+          micTranscript.innerText = 'Vuelve a presionar el micrófono y habla claro y fuerte.';
+        } else {
+          micStatus.innerText = `⚠️ Error: ${event.error}`;
+        }
       };
 
       recognition.onend = () => {
         isRecording = false;
-        stopRecordingUI('✔ Audio recibido. Procesando...');
+        const micBtn = document.getElementById('micBtn');
+        micBtn.classList.remove('recording');
         const text = document.getElementById('voiceInput').value;
         if (text && text.trim().length > 0) {
+          stopRecordingUI('✔ Audio recibido. Procesando...');
           setTimeout(() => {
             processVoice();
             stopRecordingUI('Presiona el micrófono para hablar');
           }, 350);
-        } else {
-          stopRecordingUI('Presiona el micrófono para hablar');
         }
       };
     }
@@ -257,51 +271,12 @@
         return;
       }
 
-      // 2. Si el navegador es Zen Browser / Firefox (no tiene webkitSpeechRecognition integrado)
-      // Activamos el micrófono real mediante getUserMedia para validar hardware y audio
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert("Tu navegador actual no tiene acceso al hardware de audio. Usa Google Chrome o escribe la frase directamente.");
-        return;
-      }
-
-      const micBtn = document.getElementById('micBtn');
+      // 2. Si el navegador no tiene SpeechRecognition integrado (como Zen Browser / Firefox)
       const micStatus = document.getElementById('micStatus');
       const micTranscript = document.getElementById('micTranscript');
-
-      if (!isRecording) {
-        try {
-          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          isRecording = true;
-          micBtn.classList.add('recording');
-          micStatus.classList.add('active');
-          micStatus.innerText = '🔴 Grabando audio del micrófono (Zen / Firefox)...';
-          micTranscript.innerText = 'Habla normalmente. Al terminar, vuelve a presionar el botón.';
-        } catch (err) {
-          alert("Permiso de micrófono denegado en el navegador. Habilita el acceso al micrófono en la barra de direcciones.");
-        }
-      } else {
-        // Detener grabación del micrófono
-        isRecording = false;
-        if (mediaStream) {
-          mediaStream.getTracks().forEach(track => track.stop());
-          mediaStream = null;
-        }
-        micBtn.classList.remove('recording');
-        micStatus.classList.remove('active');
-        micStatus.innerText = '✔ Audio capturado del micrófono.';
-        
-        // Si el campo de texto tiene frase o usa la actual, procesarla de inmediato
-        let phrase = document.getElementById('voiceInput').value;
-        if (!phrase || phrase.trim() === '') {
-          phrase = "vendí 15 bultos de arroz casanare y 5 de sal";
-          document.getElementById('voiceInput').value = phrase;
-        }
-        micTranscript.innerText = `"${phrase}"`;
-        setTimeout(() => {
-          processVoice();
-          micStatus.innerText = 'Presiona el micrófono para hablar';
-        }, 400);
-      }
+      micStatus.classList.add('active');
+      micStatus.innerText = '⚠️ Zen Browser no traduce voz a texto';
+      micTranscript.innerHTML = 'Para dictado oral en vivo, abre <strong style="color:white;">http://localhost:8000</strong> en <strong>Google Chrome</strong> o <strong>Chromium</strong>. En Zen/Firefox escribe directamente o usa los botones rápidos.';
     }
 
     function toggleAirplaneMode() {
