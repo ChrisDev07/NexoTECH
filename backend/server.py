@@ -17,8 +17,19 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from parser import RegionalNLPParser
-from ledger import LocalLedger, CollectivePurchasingEngine
+from ledger import LocalLedger
+from collective import CollectivePurchasingEngine
 from models import Movement
+
+STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "static"))
+MIME_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png"
+}
 
 # Inicialización de estado global persistente en SQLite
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "origo_data.db")
@@ -74,23 +85,34 @@ class OrigoHandler(BaseHTTPRequestHandler):
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
 
+    def _serve_static(self, rel_path: str):
+        safe_path = os.path.abspath(os.path.join(STATIC_DIR, rel_path.lstrip("/")))
+        if not safe_path.startswith(STATIC_DIR) or not os.path.isfile(safe_path):
+            self._send_json({"error": "Archivo estático no encontrado"}, status=404)
+            return
+        ext = os.path.splitext(safe_path)[1].lower()
+        content_type = MIME_TYPES.get(ext, "application/octet-stream")
+        try:
+            with open(safe_path, "rb") as f:
+                content = f.read()
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Cache-Control', 'no-cache')
+            self.end_headers()
+            self.wfile.write(content)
+        except Exception as e:
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(f"Error cargando recurso estático: {str(e)}".encode('utf-8'))
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
 
         if path in ["/", "/index.html"]:
-            static_file = os.path.join(os.path.dirname(__file__), "static", "index.html")
-            try:
-                with open(static_file, "rb") as f:
-                    content = f.read()
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/html; charset=utf-8')
-                self.end_headers()
-                self.wfile.write(content)
-            except Exception as e:
-                self.send_response(500)
-                self.end_headers()
-                self.wfile.write(f"Error cargando index.html: {str(e)}".encode('utf-8'))
+            self._serve_static("index.html")
+        elif path.startswith("/css/") or path.startswith("/js/"):
+            self._serve_static(path)
         elif path == "/api/stock":
             stock = LEDGER.compute_stock(PARSER.catalog["products"])
             self._send_json(stock)
