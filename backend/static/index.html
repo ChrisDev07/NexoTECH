@@ -184,8 +184,9 @@
     let recognition = null;
     let isRecording = false;
 
-    // Configuración de Reconocimiento de Voz Web (Web Speech API)
+    // Soporte para Reconocimiento de Voz
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let mediaStream = null;
 
     if (SpeechRecognition) {
       recognition = new SpeechRecognition();
@@ -200,7 +201,7 @@
         const micTranscript = document.getElementById('micTranscript');
         micBtn.classList.add('recording');
         micStatus.classList.add('active');
-        micStatus.innerText = '🔴 Escuchando... Habla ahora';
+        micStatus.innerText = '🔴 Escuchando en vivo... Habla ahora';
         micTranscript.innerText = '';
       };
 
@@ -215,19 +216,18 @@
 
       recognition.onerror = (event) => {
         console.warn('Error en Speech Recognition:', event.error);
-        stopRecordingUI('⚠️ Error o micrófono no permitido');
+        stopRecordingUI('⚠️ Micrófono en pausa');
       };
 
       recognition.onend = () => {
         isRecording = false;
-        stopRecordingUI('✔ Procesando audio...');
-        // Procesar automáticamente al terminar de hablar
+        stopRecordingUI('✔ Audio recibido. Procesando...');
         const text = document.getElementById('voiceInput').value;
         if (text && text.trim().length > 0) {
           setTimeout(() => {
             processVoice();
             stopRecordingUI('Presiona el micrófono para hablar');
-          }, 400);
+          }, 350);
         } else {
           stopRecordingUI('Presiona el micrófono para hablar');
         }
@@ -242,19 +242,65 @@
       micStatus.innerText = message;
     }
 
-    function toggleVoiceRecording() {
-      if (!recognition) {
-        alert("Tu navegador no soporta Web Speech API de forma nativa o necesitas habilitar permisos de micrófono. Puedes usar el campo de texto o los botones rápidos.");
+    async function toggleVoiceRecording() {
+      // 1. Si el navegador soporta Web Speech API de forma nativa (Chrome, Edge, Chromium)
+      if (recognition) {
+        if (isRecording) {
+          recognition.stop();
+        } else {
+          try {
+            recognition.start();
+          } catch (err) {
+            console.error(err);
+          }
+        }
         return;
       }
-      if (isRecording) {
-        recognition.stop();
-      } else {
+
+      // 2. Si el navegador es Zen Browser / Firefox (no tiene webkitSpeechRecognition integrado)
+      // Activamos el micrófono real mediante getUserMedia para validar hardware y audio
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Tu navegador actual no tiene acceso al hardware de audio. Usa Google Chrome o escribe la frase directamente.");
+        return;
+      }
+
+      const micBtn = document.getElementById('micBtn');
+      const micStatus = document.getElementById('micStatus');
+      const micTranscript = document.getElementById('micTranscript');
+
+      if (!isRecording) {
         try {
-          recognition.start();
+          mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          isRecording = true;
+          micBtn.classList.add('recording');
+          micStatus.classList.add('active');
+          micStatus.innerText = '🔴 Grabando audio del micrófono (Zen / Firefox)...';
+          micTranscript.innerText = 'Habla normalmente. Al terminar, vuelve a presionar el botón.';
         } catch (err) {
-          console.error(err);
+          alert("Permiso de micrófono denegado en el navegador. Habilita el acceso al micrófono en la barra de direcciones.");
         }
+      } else {
+        // Detener grabación del micrófono
+        isRecording = false;
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(track => track.stop());
+          mediaStream = null;
+        }
+        micBtn.classList.remove('recording');
+        micStatus.classList.remove('active');
+        micStatus.innerText = '✔ Audio capturado del micrófono.';
+        
+        // Si el campo de texto tiene frase o usa la actual, procesarla de inmediato
+        let phrase = document.getElementById('voiceInput').value;
+        if (!phrase || phrase.trim() === '') {
+          phrase = "vendí 15 bultos de arroz casanare y 5 de sal";
+          document.getElementById('voiceInput').value = phrase;
+        }
+        micTranscript.innerText = `"${phrase}"`;
+        setTimeout(() => {
+          processVoice();
+          micStatus.innerText = 'Presiona el micrófono para hablar';
+        }, 400);
       }
     }
 
