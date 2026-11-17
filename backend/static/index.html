@@ -276,57 +276,6 @@
       color: var(--primary-text);
     }
 
-    /* Manual Input Toggle */
-    .manual-toggle-btn {
-      background: none;
-      border: none;
-      color: var(--primary);
-      font-size: 0.9rem;
-      font-weight: 700;
-      cursor: pointer;
-      padding: 6px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .manual-box {
-      display: none;
-      margin-top: 10px;
-      gap: 8px;
-    }
-
-    .manual-box.open {
-      display: flex;
-    }
-
-    .manual-input {
-      flex: 1;
-      padding: 13px 14px;
-      border-radius: 14px;
-      border: 2px solid #d6d3d1;
-      font-size: 0.95rem;
-      background: #faf9f6;
-      color: var(--text);
-    }
-
-    .manual-input:focus {
-      outline: none;
-      border-color: var(--primary);
-      background: #ffffff;
-    }
-
-    .btn-send {
-      background: var(--primary);
-      color: #ffffff;
-      border: none;
-      padding: 0 18px;
-      border-radius: 14px;
-      font-weight: 800;
-      font-size: 0.95rem;
-      cursor: pointer;
-    }
-
     /* Alert Banner */
     .alert-banner {
       background: var(--danger-soft);
@@ -494,7 +443,131 @@
       border-color: var(--primary);
     }
 
-    /* History Card */
+    /* Daily Inventory Banner (00:00 - 23:59) */
+    .daily-card {
+      background: linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%);
+      border: 1.5px solid #a7f3d0;
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .daily-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+
+    .daily-window-pill {
+      background: var(--primary);
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 800;
+      padding: 5px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .daily-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .daily-kpi {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 10px 8px;
+      text-align: center;
+    }
+
+    .daily-kpi-val {
+      font-size: 1.18rem;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+
+    .daily-kpi-lbl {
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .daily-breakdown {
+      margin-top: 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag-in-day { color: #047857; }
+    .tag-out-day { color: #c2410c; }
+
+    /* History Card & Collapsible Menu */
+    .collapsible-trigger {
+      width: 100%;
+      background: var(--card);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 13px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-sm);
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .collapsible-trigger:active {
+      background: #f5f5f4;
+    }
+
+    .collapsible-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .collapsible-chevron {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #f5f5f4;
+      color: var(--text);
+      font-size: 0.9rem;
+      font-weight: 900;
+      transition: transform 0.25s ease;
+    }
+
+    .collapsible-trigger.collapsed .collapsible-chevron {
+      transform: rotate(-90deg);
+    }
+
+    .collapsible-body {
+      overflow: hidden;
+      max-height: 1200px;
+      opacity: 1;
+      transition: max-height 0.3s ease, opacity 0.22s ease;
+    }
+
+    .collapsible-body.collapsed {
+      max-height: 0;
+      opacity: 0;
+      margin: 0;
+    }
+
     .history-card {
       background: var(--card);
       border-radius: var(--radius-md);
@@ -906,20 +979,11 @@
           </div>
 
           <div class="chips-label">Ejemplos con 1 toque:</div>
-          <div class="chips-grid">
+          <div class="chips-grid" style="margin-bottom: 0;">
             <button class="quick-chip" onclick="setPhrase('venta de 5 bultos de arroz casanare')">📤 Venta 5 bultos arroz</button>
             <button class="quick-chip" onclick="setPhrase('llegaron 10 bultos de cemento gris')">📥 Llegaron 10 cemento</button>
             <button class="quick-chip" onclick="setPhrase('vendí dos y media arrobas de papa pastusa')">📤 2.5 arrobas papa</button>
             <button class="quick-chip" onclick="setPhrase('venta de 4 cajas de aceite vegetal')">📤 4 cajas aceite</button>
-          </div>
-
-          <button class="manual-toggle-btn" onclick="toggleManualInput()">
-            ⌨️ O escribir manualmente
-          </button>
-
-          <div id="manualBox" class="manual-box">
-            <input type="text" id="voiceInput" class="manual-input" placeholder='Ej: "venta de 3 bultos de arroz"' onkeydown="if(event.key==='Enter') processVoice()">
-            <button class="btn-send" onclick="processVoice()">Enviar</button>
           </div>
         </div>
 
@@ -929,25 +993,53 @@
           <button class="alert-cta" onclick="switchTab('community')">Pedir juntos →</button>
         </div>
 
-        <!-- INVENTARIO DE UN VISTAZO -->
-        <div class="section-head">
-          <div class="section-title">Tu inventario hoy</div>
-          <button class="section-link" onclick="switchTab('inventory')">Ver todo →</button>
-        </div>
-        <div id="homeStockList" class="stock-list">
-          <!-- Cargado dinámicamente -->
+        <!-- ÚLTIMOS MOVIMIENTOS (DESPLEGABLE) -->
+        <button id="historyToggleBtn" class="collapsible-trigger" onclick="toggleHistory()" aria-expanded="true">
+          <div class="section-title" style="font-size: 1.05rem;">📜 Últimos movimientos</div>
+          <div class="collapsible-right">
+            <span id="pendingSyncTag" style="font-size: 0.8rem; font-weight: 700; color: var(--primary);">☁️ Al día</span>
+            <span class="collapsible-chevron">▾</span>
+          </div>
+        </button>
+        <div id="historyList" class="collapsible-body">
+          <!-- Historial Ledger cargado dinámicamente -->
         </div>
       </section>
 
-      <!-- PESTAÑA 2: BODEGA / INVENTARIO COMPLETO -->
+      <!-- PESTAÑA 2: BODEGA / INVENTARIO DEL DÍA (00:00 - 23:59) -->
       <section id="tab-inventory" class="tab-view">
-        <div class="section-head">
-          <div class="section-title">📦 Mi Bodega</div>
-          <span id="pendingSyncTag" style="font-size: 0.82rem; font-weight: 700; color: var(--primary);">☁️ Al día</span>
+        <div class="daily-card">
+          <div class="daily-card-top">
+            <div>
+              <div style="font-size: 1.08rem; font-weight: 900; color: var(--text);">📦 Inventario del día</div>
+              <div id="dailyDateLabel" style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);">Hoy</div>
+            </div>
+            <span class="daily-window-pill">🕒 00:00 – 23:59</span>
+          </div>
+          <div class="daily-kpi-grid">
+            <div class="daily-kpi">
+              <div id="kpiInToday" class="daily-kpi-val" style="color: #047857;">+0</div>
+              <div class="daily-kpi-lbl">📥 Entradas hoy</div>
+            </div>
+            <div class="daily-kpi">
+              <div id="kpiOutToday" class="daily-kpi-val" style="color: #c2410c;">-0</div>
+              <div class="daily-kpi-lbl">📤 Ventas hoy</div>
+            </div>
+            <div class="daily-kpi">
+              <div id="kpiMovesToday" class="daily-kpi-val" style="color: var(--text);">0</div>
+              <div class="daily-kpi-lbl">🧾 Mov. hoy</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-head" style="margin-bottom: 8px;">
+          <div class="section-title" style="font-size: 1rem;">Productos en bodega</div>
+          <span id="bodegaCountTag" style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);">8 productos</span>
         </div>
 
         <div id="categoryFilters" class="filter-scroll">
           <button class="filter-pill active" onclick="filterCategory('Todos', this)">Todos</button>
+          <button class="filter-pill" onclick="filterCategory('MOVIDOS_HOY', this)">📅 Movidos hoy</button>
           <button class="filter-pill" onclick="filterCategory('Granos y Víveres', this)">Granos</button>
           <button class="filter-pill" onclick="filterCategory('Víveres', this)">Víveres</button>
           <button class="filter-pill" onclick="filterCategory('Perecederos', this)">Perecederos</button>
@@ -955,15 +1047,8 @@
           <button class="filter-pill" onclick="filterCategory('Ferretería', this)">Ferretería</button>
         </div>
 
-        <div id="fullStockList" class="stock-list" style="margin-bottom: 24px;">
+        <div id="fullStockList" class="stock-list">
           <!-- Cargado dinámicamente -->
-        </div>
-
-        <div class="section-head">
-          <div class="section-title">📜 Últimos movimientos</div>
-        </div>
-        <div id="historyList">
-          <!-- Historial Ledger -->
         </div>
       </section>
 
@@ -1068,6 +1153,7 @@
 
     let isAirplaneMode = false;
     let pendingParsedItems = [];
+    let currentPhrase = '';
     let allStock = [];
     let activeCategory = 'Todos';
     let recognition = null;
@@ -1085,7 +1171,7 @@
 
       recognition.onstart = () => {
         isRecording = true;
-        document.getElementById('voiceInput').value = '';
+        currentPhrase = '';
         document.getElementById('micBtn').classList.add('recording');
         const status = document.getElementById('micStatus');
         status.classList.remove('error');
@@ -1099,7 +1185,7 @@
           transcript += event.results[i][0].transcript;
         }
         document.getElementById('micTranscript').innerText = `"${transcript}"`;
-        document.getElementById('voiceInput').value = transcript;
+        currentPhrase = transcript;
       };
 
       recognition.onerror = (event) => {
@@ -1121,11 +1207,10 @@
       recognition.onend = () => {
         isRecording = false;
         document.getElementById('micBtn').classList.remove('recording');
-        const text = document.getElementById('voiceInput').value;
-        if (text && text.trim().length > 0) {
+        if (currentPhrase && currentPhrase.trim().length > 0) {
           document.getElementById('micStatus').innerText = '✨ Entendido. Revisando...';
           setTimeout(() => {
-            processVoice();
+            processVoice(currentPhrase);
             document.getElementById('micStatus').innerText = 'Presiona para hablar';
           }, 300);
         }
@@ -1148,18 +1233,19 @@
         'Abre en <strong>Google Chrome</strong> o toca cualquiera de los botones rápidos abajo.';
     }
 
-    function toggleManualInput() {
-      const box = document.getElementById('manualBox');
-      box.classList.toggle('open');
-      if (box.classList.contains('open')) {
-        document.getElementById('voiceInput').focus();
-      }
+    function setPhrase(phrase) {
+      currentPhrase = phrase;
+      document.getElementById('micTranscript').innerText = `"${phrase}"`;
+      processVoice(phrase);
     }
 
-    function setPhrase(phrase) {
-      document.getElementById('voiceInput').value = phrase;
-      document.getElementById('micTranscript').innerText = `"${phrase}"`;
-      processVoice();
+    // --- DESPLEGABLE DE ÚLTIMOS MOVIMIENTOS ---
+    function toggleHistory() {
+      const btn = document.getElementById('historyToggleBtn');
+      const body = document.getElementById('historyList');
+      const isNowCollapsed = body.classList.toggle('collapsed');
+      btn.classList.toggle('collapsed', isNowCollapsed);
+      btn.setAttribute('aria-expanded', String(!isNowCollapsed));
     }
 
     // --- NAVEGACIÓN ---
@@ -1168,7 +1254,7 @@
       document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
       document.getElementById(`tab-${tabName}`).classList.add('active');
       document.getElementById(`nav-${tabName}`).classList.add('active');
-      if (tabName === 'inventory') fetchMovements();
+      if (tabName === 'home') fetchMovements();
       if (tabName === 'community') loadCollectiveData();
     }
 
@@ -1201,8 +1287,8 @@
     }
 
     // --- PROCESAMIENTO NLP & MODAL CONFIRMACIÓN ---
-    async function processVoice() {
-      const phrase = document.getElementById('voiceInput').value.trim();
+    async function processVoice(phraseArg) {
+      const phrase = (phraseArg || currentPhrase || '').trim();
       if (!phrase) return;
 
       const res = await fetch('/api/nlp/parse', {
@@ -1270,7 +1356,7 @@
         body: JSON.stringify({ items: pendingParsedItems, synced: !isAirplaneMode })
       });
       document.getElementById('confirmModal').classList.remove('open');
-      document.getElementById('voiceInput').value = '';
+      currentPhrase = '';
       document.getElementById('micTranscript').innerText = '';
       pendingParsedItems = [];
 
@@ -1287,17 +1373,39 @@
       document.getElementById('confirmModal').classList.remove('open');
     }
 
-    // --- INVENTARIO & HISTORIAL ---
+    // --- INVENTARIO DEL DÍA (00:00 - 23:59) & HISTORIAL ---
     async function fetchStock() {
-      const res = await fetch('/api/stock');
-      allStock = await res.json();
-      renderHomeStock();
+      const res = await fetch('/api/stock/daily');
+      const daily = await res.json();
+      allStock = daily.items || [];
+
+      const todayFormatted = new Date().toLocaleDateString('es-CO', {
+        weekday: 'long', day: 'numeric', month: 'short', year: 'numeric'
+      });
+      document.getElementById('dailyDateLabel').innerText =
+        `📅 ${todayFormatted.charAt(0).toUpperCase() + todayFormatted.slice(1)}`;
+      document.getElementById('kpiInToday').innerText = `+${daily.summary.total_in_today}`;
+      document.getElementById('kpiOutToday').innerText = `-${daily.summary.total_out_today}`;
+      document.getElementById('kpiMovesToday').innerText = `${daily.summary.movements_count_today}`;
+
+      updateLowStockBanner();
       renderFullStock();
     }
 
     function renderProductCard(item) {
       const icon = PRODUCT_ICONS[item.product_id] || '📦';
       const isLow = item.needs_reorder;
+      const dailyDetail = item.has_activity_today
+        ? `<div class="daily-breakdown">
+             <span>00:00: ${item.opening_stock}</span>
+             <span class="tag-in-day">📥 +${item.today_in}</span>
+             <span class="tag-out-day">📤 -${item.today_out}</span>
+             ${item.last_movement_time ? `<span>· ${item.last_movement_time}</span>` : ''}
+           </div>`
+        : `<div class="daily-breakdown">
+             <span>00:00: ${item.opening_stock} · Sin movimientos hoy</span>
+           </div>`;
+
       return `
         <div class="product-card ${isLow ? 'critical' : ''}" onclick="setPhrase('venta de 1 ${item.unit} de ${item.product_name.toLowerCase()}')">
           <div class="product-left">
@@ -1305,6 +1413,7 @@
             <div>
               <div class="product-name">${item.product_name}</div>
               <div class="product-meta">Mínimo: ${item.min_threshold} ${item.unit} · ${item.category}</div>
+              ${dailyDetail}
             </div>
           </div>
           <div class="stock-pill ${isLow ? 'low' : 'ok'}">
@@ -1314,7 +1423,7 @@
       `;
     }
 
-    function renderHomeStock() {
+    function updateLowStockBanner() {
       const lowItems = allStock.filter(i => i.needs_reorder);
       const banner = document.getElementById('lowStockBanner');
       if (lowItems.length > 0) {
@@ -1326,10 +1435,6 @@
       } else {
         banner.classList.remove('visible');
       }
-
-      // Mostrar primero los críticos y luego los primeros 4
-      const sorted = [...allStock].sort((a, b) => (b.needs_reorder ? 1 : 0) - (a.needs_reorder ? 1 : 0)).slice(0, 4);
-      document.getElementById('homeStockList').innerHTML = sorted.map(renderProductCard).join('');
     }
 
     function filterCategory(cat, btn) {
@@ -1340,9 +1445,21 @@
     }
 
     function renderFullStock() {
-      const filtered = activeCategory === 'Todos'
-        ? allStock
-        : allStock.filter(i => i.category === activeCategory);
+      let filtered = allStock;
+      if (activeCategory === 'MOVIDOS_HOY') {
+        filtered = allStock.filter(i => i.has_activity_today);
+      } else if (activeCategory !== 'Todos') {
+        filtered = allStock.filter(i => i.category === activeCategory);
+      }
+      document.getElementById('bodegaCountTag').innerText = `${filtered.length} producto${filtered.length === 1 ? '' : 's'}`;
+      if (filtered.length === 0) {
+        document.getElementById('fullStockList').innerHTML = `
+          <div style="text-align: center; padding: 28px 16px; color: var(--text-muted); background: var(--card); border-radius: 16px; border: 1px dashed var(--border);">
+            Aún no hay productos movidos en esta categoría hoy (00:00 – 23:59).
+          </div>
+        `;
+        return;
+      }
       document.getElementById('fullStockList').innerHTML = filtered.map(renderProductCard).join('');
     }
 
@@ -1355,24 +1472,33 @@
         syncTag.innerText = `⏳ ${pendingCount} pendiente${pendingCount > 1 ? 's' : ''} local`;
         syncTag.style.color = '#b45309';
       } else {
-        syncTag.innerText = '☁️ Todo sincronizado';
+        syncTag.innerText = '☁️ Al día';
         syncTag.style.color = '#047857';
       }
 
+      const todayMoves = moves.filter(m => m.is_today);
+      const displayMoves = todayMoves.length > 0 ? todayMoves : moves;
+
       const container = document.getElementById('historyList');
-      container.innerHTML = moves.slice(0, 8).map(m => `
+      container.innerHTML = displayMoves.slice(0, 8).map(m => {
+        const icon = PRODUCT_ICONS[m.product_id] || '📦';
+        return `
         <div class="history-card">
-          <div>
-            <div style="font-weight: 800; font-size: 0.94rem;">
-              ${m.type === 'OUT' ? '📤 Venta' : '📥 Entrada'} · ${m.quantity} ${m.unit}
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="product-icon" style="width: 42px; height: 42px; font-size: 1.35rem;">${icon}</div>
+            <div>
+              <div style="font-weight: 800; font-size: 0.95rem;">
+                ${m.type === 'OUT' ? '📤 Venta' : '📥 Entrada'} · ${m.quantity} ${m.unit}
+              </div>
+              <div style="font-size: 0.85rem; color: var(--text-muted);">${m.product_name} · 🕒 ${m.time_str || 'Hoy'}</div>
             </div>
-            <div style="font-size: 0.84rem; color: var(--text-muted);">${m.product_name}</div>
           </div>
           <span class="sync-badge ${m.synced ? 'synced' : 'pending'}">
             ${m.synced ? '☁️ Sync' : '⏳ Offline'}
           </span>
         </div>
-      `).join('');
+      `;
+      }).join('');
     }
 
     // --- COMPRAS EN COMUNIDAD ---
