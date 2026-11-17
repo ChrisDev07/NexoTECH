@@ -48,8 +48,6 @@ El repositorio está organizado bajo una estructura modular orientada a desacopl
 
 ```text
 MyPymes/
-├── docs/                     # Documentación técnica y especificaciones
-│   └── guion_presentacion.md # Estructura técnica de presentación y defensa
 ├── core_nlp/                 # Motor de procesamiento de lenguaje natural heurístico local
 │   ├── catalog.json          # Catálogo tipificado con métricas y unidades regionales
 │   ├── parser.py             # Normalización léxica, extracción de entidades y fuzzy matching
