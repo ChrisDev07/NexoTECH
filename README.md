@@ -1,4 +1,4 @@
-# NexoLlano 🌾📲
+# ORIGO 🌾📲
 
 > **Inventario por voz sin internet y central de compras colectiva para las MiPymes de Casanare**  
 > Proyecto desarrollado por el equipo **NexoTECH** para la convocatoria de innovación abierta **CREATIC Casanare**  
