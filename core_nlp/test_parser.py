@@ -83,5 +83,19 @@ class TestRegionalNLPParser(unittest.TestCase):
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0]["product_id"], "prod_arroz_casanare")
 
+    def test_venta_as_salida(self):
+        res = self.parser.parse_phrase("venta de 3 bultos de arroz casanare")
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["action"], "SALIDA")
+        self.assertEqual(res[0]["quantity"], 3.0)
+        self.assertEqual(res[0]["product_id"], "prod_arroz_casanare")
+
+    def test_hice_una_venta(self):
+        res = self.parser.parse_phrase("hice una venta de diez pacas de harina")
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]["action"], "SALIDA")
+        self.assertEqual(res[0]["quantity"], 10.0)
+        self.assertEqual(res[0]["product_id"], "prod_harina_pan")
+
 if __name__ == "__main__":
     unittest.main()

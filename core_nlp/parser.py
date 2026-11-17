@@ -159,6 +159,8 @@ class RegionalNLPParser:
         Soporta oraciones compuestas con conectores ("y", "también").
         """
         text_norm = normalize_text(raw_phrase)
+        # Normalizar artículos antes de palabras de acción ("una venta", "un despacho") para no confundir 'un/una' con cantidad
+        text_norm = re.sub(r'\b(un|una)\s+(venta|ventas|compra|compras|salida|salidas|entrada|entradas|despacho|despachos|ingreso|ingresos|pedido|pedidos)\b', r'\2', text_norm)
         action = self.detect_action(text_norm)
 
         # Proteger frases como "y media" o "y medio" para que no se separen por 'y'
@@ -220,7 +222,7 @@ class RegionalNLPParser:
                 product_query = re.sub(r'\b' + re.escape(detected_unit_str) + r'\b', ' ', product_query, count=1)
 
             # Limpiar preposiciones, palabras de acción y muletillas
-            filter_words = set(self.in_keywords + self.out_keywords + ["de", "del", "pa", "para", "en", "por", "favor", "aqui", "se", "me", "le", "nos"])
+            filter_words = set(self.in_keywords + self.out_keywords + ["de", "del", "pa", "para", "en", "por", "favor", "aqui", "se", "me", "le", "nos", "hice", "anota", "anotar", "apunta", "apuntar", "registro", "registrar"])
             tokens = [w for w in product_query.split() if w not in filter_words]
             clean_product_query = " ".join(tokens)
 

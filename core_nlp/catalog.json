@@ -20,13 +20,15 @@
       "compre", "compré", "compramos",
       "entran", "entra", "entraron",
       "ingreso", "ingresó", "ingresaron",
-      "descargaron", "trajeron", "abasteci", "abastecí"
+      "descargaron", "trajeron", "abasteci", "abastecí",
+      "entrada", "entradas", "compra", "compras"
     ],
     "OUT": [
-      "vendi", "vendí", "vendimos",
-      "salio", "salió", "salieron",
-      "se llevaron", "llevaron",
-      "despache", "despaché", "despachamos",
+      "venta", "ventas", "vende", "vender",
+      "vendi", "vendí", "vendimos", "vendio", "vendió", "vendieron",
+      "salio", "salió", "salieron", "salida", "salidas",
+      "se llevaron", "llevaron", "lleva", "llevan",
+      "despache", "despaché", "despachamos", "despacho", "despachó",
       "saque", "saqué", "sacaron",
       "gaste", "gasté", "consumi", "consumí"
     ]
