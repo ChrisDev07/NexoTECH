@@ -34,6 +34,9 @@ class ProductStock {
   final String name;
   final String category;
   final String unit;
+  final double openingStock;
+  double todayIn;
+  double todayOut;
   double quantity;
   final double minThreshold;
 
@@ -45,9 +48,31 @@ class ProductStock {
     required this.unit,
     required this.quantity,
     required this.minThreshold,
-  });
+    double? openingStock,
+    this.todayIn = 0,
+    this.todayOut = 0,
+  }) : openingStock = openingStock ?? quantity;
 
   bool get isCritical => quantity <= minThreshold;
+  bool get hasActivityToday => todayIn > 0 || todayOut > 0;
+}
+
+class MovementLog {
+  final String icon;
+  final String productName;
+  final bool isSale;
+  final double quantity;
+  final String unit;
+  bool synced;
+
+  MovementLog({
+    required this.icon,
+    required this.productName,
+    required this.isSale,
+    required this.quantity,
+    required this.unit,
+    required this.synced,
+  });
 }
 
 class OrigoHomeShell extends StatefulWidget {
@@ -61,7 +86,36 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   int _selectedTab = 0;
   bool _isOfflineMode = true;
   bool _isListening = false;
+  bool _isHistoryExpanded = true;
+  bool _onlyMovedToday = false;
   int _extraCollectiveBultos = 0;
+
+  final List<MovementLog> _recentMovements = [
+    MovementLog(
+      icon: '🌾',
+      productName: 'Arroz Casanareño',
+      isSale: true,
+      quantity: 5,
+      unit: 'bultos',
+      synced: true,
+    ),
+    MovementLog(
+      icon: '🧱',
+      productName: 'Cemento Gris 50kg',
+      isSale: false,
+      quantity: 10,
+      unit: 'bultos',
+      synced: true,
+    ),
+    MovementLog(
+      icon: '🥔',
+      productName: 'Papa Pastusa / Criolla',
+      isSale: true,
+      quantity: 3,
+      unit: 'arrobas',
+      synced: true,
+    ),
+  ];
 
   final List<ProductStock> _inventory = [
     ProductStock(
@@ -258,9 +312,22 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
                         setState(() {
                           if (currentIsSale) {
                             product.quantity = (product.quantity - currentQty).clamp(0, 9999);
+                            product.todayOut += currentQty;
                           } else {
                             product.quantity += currentQty;
+                            product.todayIn += currentQty;
                           }
+                          _recentMovements.insert(
+                            0,
+                            MovementLog(
+                              icon: product.icon,
+                              productName: product.name,
+                              isSale: currentIsSale,
+                              quantity: currentQty,
+                              unit: product.unit,
+                              synced: !_isOfflineMode,
+                            ),
+                          );
                         });
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -332,7 +399,16 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
                 ),
               ),
               InkWell(
-                onTap: () => setState(() => _isOfflineMode = !_isOfflineMode),
+                onTap: () {
+                  setState(() {
+                    _isOfflineMode = !_isOfflineMode;
+                    if (!_isOfflineMode) {
+                      for (final m in _recentMovements) {
+                        m.synced = true;
+                      }
+                    }
+                  });
+                },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -393,7 +469,11 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
           child: Text(item.icon, style: const TextStyle(fontSize: 24)),
         ),
         title: Text(item.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-        subtitle: Text('Mínimo: ${item.minThreshold.toInt()} ${item.unit}'),
+        subtitle: Text(
+          item.hasActivityToday
+              ? '00:00: ${item.openingStock.toInt()} · Hoy: +${item.todayIn.toInt()} / -${item.todayOut.toInt()}'
+              : '00:00: ${item.openingStock.toInt()} · Sin movimientos hoy',
+        ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
@@ -502,26 +582,215 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
           ),
           const SizedBox(height: 16),
         ],
-        const Text(
-          'Tu inventario hoy',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+        InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => setState(() => _isHistoryExpanded = !_isHistoryExpanded),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE7E5E4), width: 1.5),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  '📜 Últimos movimientos',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+                ),
+                Row(
+                  children: [
+                    Text(
+                      _recentMovements.any((m) => !m.synced)
+                          ? '⏳ Pendientes'
+                          : '☁️ Al día',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: _recentMovements.any((m) => !m.synced)
+                            ? const Color(0xFFB45309)
+                            : const Color(0xFF047857),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      _isHistoryExpanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: const Color(0xFF1C1917),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
         const SizedBox(height: 10),
-        ..._inventory.take(4).map(_buildProductCard),
+        if (_isHistoryExpanded)
+          ..._recentMovements.take(8).map((m) {
+          final qtyText = m.quantity.toStringAsFixed(m.quantity % 1 == 0 ? 0 : 1);
+          return Card(
+            elevation: 0,
+            margin: const EdgeInsets.only(bottom: 8),
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: const BorderSide(color: Color(0xFFE7E5E4)),
+            ),
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              leading: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(m.icon, style: const TextStyle(fontSize: 22)),
+              ),
+              title: Text(
+                '${m.isSale ? "📤 Venta" : "📥 Entrada"} · $qtyText ${m.unit}',
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+              ),
+              subtitle: Text(m.productName),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: m.synced ? const Color(0xFFECFDF5) : const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  m.synced ? '☁️ Sync' : '⏳ Offline',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: m.synced ? const Color(0xFF047857) : const Color(0xFFB45309),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ],
     );
   }
 
   Widget _buildInventoryTab() {
+    final totalIn = _inventory.fold<double>(0, (sum, p) => sum + p.todayIn);
+    final totalOut = _inventory.fold<double>(0, (sum, p) => sum + p.todayOut);
+    final items = _onlyMovedToday
+        ? _inventory.where((p) => p.hasActivityToday).toList()
+        : _inventory;
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        const Text(
-          '📦 Mi Bodega Completa',
-          style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFECFDF5),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFA7F3D0), width: 1.5),
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    '📦 Inventario del día',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF047857),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Text(
+                      '🕒 00:00 – 23:59',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '+${totalIn.toInt()}',
+                            style: const TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF047857),
+                            ),
+                          ),
+                          const Text('📥 Entradas hoy', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            '-${totalOut.toInt()}',
+                            style: const TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFC2410C),
+                            ),
+                          ),
+                          const Text('📤 Ventas hoy', style: TextStyle(fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
-        ..._inventory.map(_buildProductCard),
+        Row(
+          children: [
+            ChoiceChip(
+              label: const Text('Todos'),
+              selected: !_onlyMovedToday,
+              onSelected: (_) => setState(() => _onlyMovedToday = false),
+            ),
+            const SizedBox(width: 8),
+            ChoiceChip(
+              label: const Text('📅 Movidos hoy'),
+              selected: _onlyMovedToday,
+              onSelected: (_) => setState(() => _onlyMovedToday = true),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...items.map(_buildProductCard),
       ],
     );
   }
