@@ -11,167 +11,260 @@
   <div id="toast" class="toast">✅ Movimiento guardado</div>
 
   <div class="app-shell">
-    <!-- CABECERA CÁLIDA DE ORIGO -->
-    <header class="app-header">
-      <div class="header-top">
-        <span class="brand-tag">🌾 ORIGO</span>
-        <button id="connPill" class="conn-pill" onclick="OrigoApp.toggleAirplaneMode()">
-          <span id="connIcon">🟢</span>
-          <span id="connText">Conectado</span>
-        </button>
+
+    <!-- VISTA DE ACCESO SEGURO Y REGISTRO (CAP. 4.4 Y 4.5 LEY 1581) -->
+    <div id="authView" class="auth-view">
+      <div class="auth-hero">
+        <div class="auth-logo">🌾 ORIGO</div>
+        <div class="auth-tagline">Inventario por voz sin internet y compras en comunidad para las MiPymes de Casanare</div>
       </div>
-      <div class="greeting">¡Hola, Don Pedro! ☀️</div>
-      <div class="store-sub">📍 Tienda La Esperanza · Comuna 2, Yopal</div>
-    </header>
 
-    <!-- CONTENIDO PRINCIPAL -->
-    <main class="app-content">
+      <div class="auth-card">
+        <div class="auth-tabs">
+          <button id="authTabLogin" class="auth-tab active" onclick="OrigoAuth.switchAuthMode('login')">Entrar</button>
+          <button id="authTabRegister" class="auth-tab" onclick="OrigoAuth.switchAuthMode('register')">Crear mi tienda</button>
+        </div>
 
-      <!-- PESTAÑA 1: INICIO (VOZ + ÚLTIMOS MOVIMIENTOS DESPLEGABLE) -->
-      <section id="tab-home" class="tab-view active">
-        <div class="voice-hero">
-          <div class="voice-title">Registra con tu voz</div>
-          <div class="voice-hint">Sin teclados ni formularios. Funciona incluso sin internet.</div>
+        <div id="authError" class="auth-error"></div>
 
-          <div class="mic-wrapper">
-            <button id="micBtn" class="btn-mic-hero" onclick="OrigoVoice.toggle()" aria-label="Presionar para hablar">
-              🎙️
+        <!-- FORMULARIO INICIO DE SESIÓN -->
+        <form id="loginForm" onsubmit="OrigoAuth.submitLogin(event)">
+          <div class="form-field">
+            <label class="form-label" for="loginPhone">📱 Número celular</label>
+            <input id="loginPhone" class="form-input" type="tel" inputmode="numeric" placeholder="Ej. 3101234567" required>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="loginPin">🔐 Clave numérica (4 a 6 dígitos)</label>
+            <input id="loginPin" class="form-input" type="password" inputmode="numeric" maxlength="6" placeholder="••••" required>
+          </div>
+          <button type="submit" class="btn-confirm-big">✔ Entrar a mi tienda</button>
+          <button type="button" class="btn-demo-quick" onclick="OrigoAuth.loginDemo()">
+            ⚡ Entrar con cuenta demo (Don Pedro)
+          </button>
+        </form>
+
+        <!-- FORMULARIO REGISTRO DE TIENDA + HABEAS DATA -->
+        <form id="registerForm" style="display: none;" onsubmit="OrigoAuth.submitRegister(event)">
+          <div class="form-field">
+            <label class="form-label" for="regOwner">👤 Tu nombre</label>
+            <input id="regOwner" class="form-input" type="text" placeholder="Ej. Doña Martha" required>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="regBusiness">🏪 Nombre de tu negocio</label>
+            <input id="regBusiness" class="form-input" type="text" placeholder="Ej. Agroinsumos El Llano" required>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="regZone">📍 Municipio / Zona en Casanare</label>
+            <select id="regZone" class="form-input">
+              <option value="Comuna 2, Yopal">Comuna 2, Yopal</option>
+              <option value="Comuna 5, Yopal">Comuna 5, Yopal</option>
+              <option value="Centro, Aguazul">Centro, Aguazul</option>
+              <option value="Villanueva">Villanueva</option>
+              <option value="Tauramena">Tauramena</option>
+              <option value="Maní">Maní</option>
+              <option value="Paz de Ariporo">Paz de Ariporo</option>
+              <option value="Monterrey">Monterrey</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="regPhone">📱 Número celular</label>
+            <input id="regPhone" class="form-input" type="tel" inputmode="numeric" placeholder="Ej. 3205551234" required>
+          </div>
+          <div class="form-field">
+            <label class="form-label" for="regPin">🔐 Crea tu clave (4 a 6 números)</label>
+            <input id="regPin" class="form-input" type="password" inputmode="numeric" maxlength="6" placeholder="Ej. 1234" required>
+          </div>
+
+          <div class="habeas-box">
+            <input id="regHabeas" type="checkbox">
+            <div class="habeas-text">
+              Acepto el tratamiento mínimo de mis datos conforme a la <strong>Ley 1581 de 2012 (Habeas Data)</strong>.
+              <br>
+              <button type="button" class="link-privacy" onclick="OrigoAuth.openPrivacyModal()">
+                🛡️ Leer Aviso de Privacidad completo
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn-confirm-big">✨ Crear mi tienda y empezar</button>
+        </form>
+
+        <div style="text-align: center; margin-top: 14px;">
+          <button type="button" class="link-privacy" onclick="OrigoAuth.openPrivacyModal()">
+            🛡️ Política de Privacidad · Ley 1581 de 2012
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- APLICACIÓN PRINCIPAL (VISIBLE AL INICIAR SESIÓN) -->
+    <div id="mainAppView" style="display: none; flex-direction: column; flex: 1;">
+      <!-- CABECERA CÁLIDA DE ORIGO -->
+      <header class="app-header">
+        <div class="header-top">
+          <span class="brand-tag">🌾 ORIGO</span>
+          <div class="header-actions">
+            <button id="connPill" class="conn-pill" onclick="OrigoApp.toggleAirplaneMode()">
+              <span id="connIcon">🟢</span>
+              <span id="connText">Conectado</span>
             </button>
-            <div id="micStatus" class="mic-status-text">Presiona para hablar</div>
-            <div id="micTranscript" class="mic-transcript-box"></div>
+            <button class="icon-pill-btn" onclick="OrigoAuth.openPrivacyModal()" title="Aviso de Privacidad (Ley 1581)">🛡️</button>
+            <button class="icon-pill-btn" onclick="OrigoAuth.logout()" title="Cerrar sesión">🚪</button>
           </div>
         </div>
+        <div id="greetingName" class="greeting">¡Hola, Don Pedro! ☀️</div>
+        <div id="storeSubtitle" class="store-sub">📍 Tienda La Esperanza · Comuna 2, Yopal</div>
+      </header>
 
-        <!-- ALERTA DINÁMICA DE REPOSICIÓN -->
-        <div id="lowStockBanner" class="alert-banner">
-          <div id="lowStockText" class="alert-text">⚠️ Tienes productos bajos de inventario</div>
-          <button class="alert-cta" onclick="OrigoApp.switchTab('community')">Pedir juntos →</button>
-        </div>
+      <!-- CONTENIDO PRINCIPAL -->
+      <main class="app-content">
 
-        <!-- ÚLTIMOS MOVIMIENTOS (DESPLEGABLE) -->
-        <button id="historyToggleBtn" class="collapsible-trigger" onclick="OrigoInventory.toggleHistory()" aria-expanded="true">
-          <div class="section-title" style="font-size: 1.05rem;">📜 Últimos movimientos</div>
-          <div class="collapsible-right">
-            <span id="pendingSyncTag" style="font-size: 0.8rem; font-weight: 700; color: var(--primary);">☁️ Al día</span>
-            <span class="collapsible-chevron">▾</span>
+        <!-- PESTAÑA 1: INICIO (VOZ + ÚLTIMOS MOVIMIENTOS DESPLEGABLE) -->
+        <section id="tab-home" class="tab-view active">
+          <div class="voice-hero">
+            <div class="voice-title">Registra con tu voz</div>
+            <div class="voice-hint">Sin teclados ni formularios. Funciona incluso sin internet.</div>
+
+            <div class="mic-wrapper">
+              <button id="micBtn" class="btn-mic-hero" onclick="OrigoVoice.toggle()" aria-label="Presionar para hablar">
+                🎙️
+              </button>
+              <div id="micStatus" class="mic-status-text">Presiona para hablar</div>
+              <div id="micTranscript" class="mic-transcript-box"></div>
+            </div>
           </div>
+
+          <!-- ALERTA DINÁMICA DE REPOSICIÓN -->
+          <div id="lowStockBanner" class="alert-banner">
+            <div id="lowStockText" class="alert-text">⚠️ Tienes productos bajos de inventario</div>
+            <button class="alert-cta" onclick="OrigoApp.switchTab('community')">Pedir juntos →</button>
+          </div>
+
+          <!-- ÚLTIMOS MOVIMIENTOS (DESPLEGABLE) -->
+          <button id="historyToggleBtn" class="collapsible-trigger" onclick="OrigoInventory.toggleHistory()" aria-expanded="true">
+            <div class="section-title" style="font-size: 1.05rem;">📜 Últimos movimientos</div>
+            <div class="collapsible-right">
+              <span id="pendingSyncTag" style="font-size: 0.8rem; font-weight: 700; color: var(--primary);">☁️ Al día</span>
+              <span class="collapsible-chevron">▾</span>
+            </div>
+          </button>
+          <div id="historyList" class="collapsible-body"></div>
+        </section>
+
+        <!-- PESTAÑA 2: BODEGA / INVENTARIO DEL DÍA (00:00 - 23:59) -->
+        <section id="tab-inventory" class="tab-view">
+          <div class="daily-card">
+            <div class="daily-card-top">
+              <div>
+                <div style="font-size: 1.08rem; font-weight: 900; color: var(--text);">📦 Inventario del día</div>
+                <div id="dailyDateLabel" style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);">Hoy</div>
+              </div>
+              <span class="daily-window-pill">🕒 00:00 – 23:59</span>
+            </div>
+            <div class="daily-kpi-grid">
+              <div class="daily-kpi">
+                <div id="kpiInToday" class="daily-kpi-val" style="color: #047857;">+0</div>
+                <div class="daily-kpi-lbl">📥 Entradas hoy</div>
+              </div>
+              <div class="daily-kpi">
+                <div id="kpiOutToday" class="daily-kpi-val" style="color: #c2410c;">-0</div>
+                <div class="daily-kpi-lbl">📤 Ventas hoy</div>
+              </div>
+              <div class="daily-kpi">
+                <div id="kpiMovesToday" class="daily-kpi-val" style="color: var(--text);">0</div>
+                <div class="daily-kpi-lbl">🧾 Mov. hoy</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-head" style="margin-bottom: 8px;">
+            <div class="section-title" style="font-size: 1rem;">Productos en bodega</div>
+            <span id="bodegaCountTag" style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);">8 productos</span>
+          </div>
+
+          <div id="categoryFilters" class="filter-scroll">
+            <button class="filter-pill active" onclick="OrigoInventory.filterCategory('Todos', this)">Todos</button>
+            <button class="filter-pill" onclick="OrigoInventory.filterCategory('MOVIDOS_HOY', this)">📅 Movidos hoy</button>
+            <button class="filter-pill" onclick="OrigoInventory.filterCategory('Granos y Víveres', this)">Granos</button>
+            <button class="filter-pill" onclick="OrigoInventory.filterCategory('Víveres', this)">Víveres</button>
+            <button class="filter-pill" onclick="OrigoInventory.filterCategory('Perecederos', this)">Perecederos</button>
+            <button class="filter-pill" onclick="OrigoInventory.filterCategory('Agroinsumos', this)">Agroinsumos</button>
+            <button class="filter-pill" onclick="OrigoInventory.filterCategory('Ferretería', this)">Ferretería</button>
+          </div>
+
+          <div id="fullStockList" class="stock-list"></div>
+        </section>
+
+        <!-- PESTAÑA 3: COMPRAS EN COMUNIDAD -->
+        <section id="tab-community" class="tab-view">
+          <div class="community-hero">
+            <h2>🤝 Juntos compramos más barato</h2>
+            <p>Unimos los pedidos de tu zona para comprar a precio de molino y repartir el costo del flete.</p>
+          </div>
+
+          <div class="progress-card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <strong style="font-size: 1rem;">🌾 Arroz Casanareño (50kg)</strong>
+              <span id="discountBadge" style="background: var(--primary-soft); color: var(--primary-text); padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 800;">16.2% Dcto</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div id="volumeBar" class="progress-bar-fill" style="width: 70%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: var(--text-muted); font-weight: 700;">
+              <span id="volumeLabel">70 / 100 bultos reunidos</span>
+              <span id="storesBadge">4 tiendas</span>
+            </div>
+          </div>
+
+          <div class="savings-card">
+            <div id="communityZoneTitle" style="font-weight: 900; color: #92400e; font-size: 1.05rem; margin-bottom: 12px;">
+              💰 Ahorro de la semana · Comuna 2
+            </div>
+            <div class="savings-row">
+              <span>Descuento por volumen mayorista:</span>
+              <strong id="commPriceSaving">$2.100.000 COP</strong>
+            </div>
+            <div class="savings-row">
+              <span>Ahorro en flete compartido:</span>
+              <strong id="commFreightSaving">$360.000 COP</strong>
+            </div>
+            <div class="savings-row">
+              <span>Flete por cada tienda:</span>
+              <strong id="commFreightEach">$30.000 COP</strong>
+            </div>
+            <div class="savings-total">
+              <span style="font-weight: 900; color: #78350f;">AHORRO TOTAL NETO:</span>
+              <span id="commTotalSaving" class="savings-total-val">$2.460.000</span>
+            </div>
+          </div>
+
+          <button id="joinOrderBtn" class="btn-join-community" onclick="OrigoCommunity.joinOrder()">
+            🤝 Sumar mi pedido a la compra semanal
+          </button>
+
+          <div class="section-head">
+            <div class="section-title">🏪 Vecinos en este pedido</div>
+          </div>
+          <div id="neighborsList"></div>
+        </section>
+      </main>
+
+      <!-- NAVEGACIÓN INFERIOR -->
+      <nav class="bottom-nav">
+        <button id="nav-home" class="nav-btn active" onclick="OrigoApp.switchTab('home')">
+          <span class="nav-icon">🏠</span>
+          <span>Inicio</span>
         </button>
-        <div id="historyList" class="collapsible-body"></div>
-      </section>
-
-      <!-- PESTAÑA 2: BODEGA / INVENTARIO DEL DÍA (00:00 - 23:59) -->
-      <section id="tab-inventory" class="tab-view">
-        <div class="daily-card">
-          <div class="daily-card-top">
-            <div>
-              <div style="font-size: 1.08rem; font-weight: 900; color: var(--text);">📦 Inventario del día</div>
-              <div id="dailyDateLabel" style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);">Hoy</div>
-            </div>
-            <span class="daily-window-pill">🕒 00:00 – 23:59</span>
-          </div>
-          <div class="daily-kpi-grid">
-            <div class="daily-kpi">
-              <div id="kpiInToday" class="daily-kpi-val" style="color: #047857;">+0</div>
-              <div class="daily-kpi-lbl">📥 Entradas hoy</div>
-            </div>
-            <div class="daily-kpi">
-              <div id="kpiOutToday" class="daily-kpi-val" style="color: #c2410c;">-0</div>
-              <div class="daily-kpi-lbl">📤 Ventas hoy</div>
-            </div>
-            <div class="daily-kpi">
-              <div id="kpiMovesToday" class="daily-kpi-val" style="color: var(--text);">0</div>
-              <div class="daily-kpi-lbl">🧾 Mov. hoy</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="section-head" style="margin-bottom: 8px;">
-          <div class="section-title" style="font-size: 1rem;">Productos en bodega</div>
-          <span id="bodegaCountTag" style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);">8 productos</span>
-        </div>
-
-        <div id="categoryFilters" class="filter-scroll">
-          <button class="filter-pill active" onclick="OrigoInventory.filterCategory('Todos', this)">Todos</button>
-          <button class="filter-pill" onclick="OrigoInventory.filterCategory('MOVIDOS_HOY', this)">📅 Movidos hoy</button>
-          <button class="filter-pill" onclick="OrigoInventory.filterCategory('Granos y Víveres', this)">Granos</button>
-          <button class="filter-pill" onclick="OrigoInventory.filterCategory('Víveres', this)">Víveres</button>
-          <button class="filter-pill" onclick="OrigoInventory.filterCategory('Perecederos', this)">Perecederos</button>
-          <button class="filter-pill" onclick="OrigoInventory.filterCategory('Agroinsumos', this)">Agroinsumos</button>
-          <button class="filter-pill" onclick="OrigoInventory.filterCategory('Ferretería', this)">Ferretería</button>
-        </div>
-
-        <div id="fullStockList" class="stock-list"></div>
-      </section>
-
-      <!-- PESTAÑA 3: COMPRAS EN COMUNIDAD -->
-      <section id="tab-community" class="tab-view">
-        <div class="community-hero">
-          <h2>🤝 Juntos compramos más barato</h2>
-          <p>Unimos los pedidos de tu zona para comprar a precio de molino y repartir el costo del flete.</p>
-        </div>
-
-        <div class="progress-card">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <strong style="font-size: 1rem;">🌾 Arroz Casanareño (50kg)</strong>
-            <span id="discountBadge" style="background: var(--primary-soft); color: var(--primary-text); padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 800;">16.2% Dcto</span>
-          </div>
-          <div class="progress-bar-bg">
-            <div id="volumeBar" class="progress-bar-fill" style="width: 70%;"></div>
-          </div>
-          <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: var(--text-muted); font-weight: 700;">
-            <span id="volumeLabel">70 / 100 bultos reunidos</span>
-            <span id="storesBadge">4 tiendas</span>
-          </div>
-        </div>
-
-        <div class="savings-card">
-          <div style="font-weight: 900; color: #92400e; font-size: 1.05rem; margin-bottom: 12px;">
-            💰 Ahorro de la semana · Comuna 2
-          </div>
-          <div class="savings-row">
-            <span>Descuento por volumen mayorista:</span>
-            <strong id="commPriceSaving">$2.100.000 COP</strong>
-          </div>
-          <div class="savings-row">
-            <span>Ahorro en flete compartido:</span>
-            <strong id="commFreightSaving">$360.000 COP</strong>
-          </div>
-          <div class="savings-row">
-            <span>Flete por cada tienda:</span>
-            <strong id="commFreightEach">$30.000 COP</strong>
-          </div>
-          <div class="savings-total">
-            <span style="font-weight: 900; color: #78350f;">AHORRO TOTAL NETO:</span>
-            <span id="commTotalSaving" class="savings-total-val">$2.460.000</span>
-          </div>
-        </div>
-
-        <button id="joinOrderBtn" class="btn-join-community" onclick="OrigoCommunity.joinOrder()">
-          🤝 Sumar mi pedido a la compra semanal
+        <button id="nav-inventory" class="nav-btn" onclick="OrigoApp.switchTab('inventory')">
+          <span class="nav-icon">📦</span>
+          <span>Bodega</span>
         </button>
-
-        <div class="section-head">
-          <div class="section-title">🏪 Vecinos en este pedido</div>
-        </div>
-        <div id="neighborsList"></div>
-      </section>
-    </main>
-
-    <!-- NAVEGACIÓN INFERIOR -->
-    <nav class="bottom-nav">
-      <button id="nav-home" class="nav-btn active" onclick="OrigoApp.switchTab('home')">
-        <span class="nav-icon">🏠</span>
-        <span>Inicio</span>
-      </button>
-      <button id="nav-inventory" class="nav-btn" onclick="OrigoApp.switchTab('inventory')">
-        <span class="nav-icon">📦</span>
-        <span>Bodega</span>
-      </button>
-      <button id="nav-community" class="nav-btn" onclick="OrigoApp.switchTab('community')">
-        <span class="nav-icon">🤝</span>
-        <span>Comunidad</span>
-      </button>
-    </nav>
+        <button id="nav-community" class="nav-btn" onclick="OrigoApp.switchTab('community')">
+          <span class="nav-icon">🤝</span>
+          <span>Comunidad</span>
+        </button>
+      </nav>
+    </div>
   </div>
 
   <!-- MODAL FLOTANTE DE CONFIRMACIÓN ANTI-ERRORES -->
@@ -186,8 +279,25 @@
     </div>
   </div>
 
+  <!-- MODAL DE AVISO DE PRIVACIDAD (LEY 1581 DE 2012 - HABEAS DATA) -->
+  <div id="privacyModal" class="modal-backdrop">
+    <div class="bottom-sheet">
+      <div class="sheet-handle"></div>
+      <div id="privacyTitle" class="sheet-title" style="font-size: 1.15rem;">🛡️ Aviso de Privacidad (Ley 1581)</div>
+      <div class="sheet-sub">Protección de datos personales en Colombia</div>
+      <div id="privacySummary" class="privacy-box"></div>
+      <div id="privacyRoles" class="privacy-box"></div>
+      <div class="privacy-box">
+        <strong>Tus derechos como titular:</strong>
+        <ul id="privacyRights" style="list-style: none; margin-top: 8px; padding-left: 0;"></ul>
+      </div>
+      <button class="btn-confirm-big" onclick="OrigoAuth.closePrivacyModal()">✔ Entendido</button>
+    </div>
+  </div>
+
   <!-- MÓDULOS JAVASCRIPT -->
   <script src="/js/api.js"></script>
+  <script src="/js/auth.js"></script>
   <script src="/js/voice.js"></script>
   <script src="/js/inventory.js"></script>
   <script src="/js/community.js"></script>

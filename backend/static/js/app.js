@@ -126,11 +126,18 @@ window.OrigoApp = (() => {
     document.getElementById('confirmModal').classList.remove('open');
   }
 
-  function boot() {
-    window.OrigoVoice.init(triggerPhrase);
+  function loadDashboardData() {
     window.OrigoInventory.refreshStock();
     window.OrigoInventory.refreshMovements();
     window.OrigoCommunity.refresh();
+  }
+
+  function boot() {
+    window.OrigoVoice.init(triggerPhrase);
+    window.OrigoAuth.init(() => {
+      switchTab('home');
+      loadDashboardData();
+    });
   }
 
   return {
