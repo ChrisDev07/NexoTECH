@@ -48,23 +48,32 @@ El repositorio está organizado bajo una estructura modular orientada a desacopl
 
 ```text
 MyPymes/
-├── core_nlp/                 # Motor de procesamiento de lenguaje natural heurístico local
-│   ├── catalog.json          # Catálogo tipificado con métricas y unidades regionales
-│   ├── parser.py             # Normalización léxica, extracción de entidades y fuzzy matching
-│   └── test_parser.py        # Suite de pruebas unitarias de interpretación lingüística
-├── backend/                  # Servicios de sincronización y motor de agregación
-│   ├── models.py             # Modelos de dominio y contratos de datos
-│   ├── ledger.py             # Modelo inmutable de transacciones (Event Sourcing)
-│   ├── server.py             # Servidor de servicios REST y consola de monitoreo
-│   ├── simulate_workflow.py  # Módulo de validación de flujo integral y red colectiva
-│   ├── static/               # Consola web de interacción en tiempo real
-│   └── test_ledger.py        # Pruebas unitarias de integridad transaccional
-├── mobile/                   # Cliente móvil multiplataforma (Flutter / Dart)
-│   ├── lib/                  # Vistas operativas y controlador de captura oral (PTT)
-│   ├── assets/               # Catálogo regional para resolución sin conectividad
-│   └── pubspec.yaml          # Definición de arquitectura y dependencias móviles
-├── .gitignore                # Reglas de exclusión de artefactos y entorno
-└── README.md                 # Documento técnico principal
+├── core_nlp/                     # Motor NLP heurístico local (cero dependencias)
+│   ├── catalog.json              # Catálogo tipificado con unidades regionales de Casanare
+│   ├── parser.py                 # Normalización léxica, extracción de entidades y fuzzy matching
+│   └── test_parser.py            # Suite de pruebas unitarias de interpretación lingüística
+├── backend/                      # Servicios modulares (Event Sourcing + Compras Colectivas)
+│   ├── models.py                 # Contratos y modelos de dominio
+│   ├── ledger.py                 # Libro mayor inmutable SQLite y corte diario (00:00–23:59)
+│   ├── collective.py             # Motor independiente de central de compras colectivas
+│   ├── server.py                 # Servidor REST y despachador de recursos estáticos
+│   ├── simulate_workflow.py      # Validación E2E del flujo operativo y red colectiva
+│   ├── test_ledger.py            # Pruebas unitarias de integridad y corte diario
+│   └── static/                   # Interfaz web modularizada
+│       ├── index.html            # Estructura semántica limpia
+│       ├── css/styles.css        # Sistema de diseño accesible (WCAG AAA)
+│       └── js/                   # Módulos: api.js, voice.js, inventory.js, community.js, app.js
+├── mobile/                       # Cliente móvil multiplataforma modular (Flutter / Dart)
+│   ├── lib/
+│   │   ├── main.dart             # Orquestador principal y navegación
+│   │   ├── models/               # Modelos: product_stock.dart, movement_log.dart
+│   │   ├── screens/              # Pantallas: home_screen, inventory_screen, community_screen
+│   │   └── widgets/              # Componentes: origo_header, product_card, confirmation_sheet
+│   ├── assets/catalog.json       # Catálogo regional offline
+│   └── pubspec.yaml              # Configuración Flutter
+├── docs/                         # Documentación técnica y guion de presentación
+├── .gitignore                    # Reglas de exclusión del entorno
+└── README.md                     # Documento técnico principal
 ```
 
 ---
