@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'models/merchant_profile.dart';
 import 'models/movement_log.dart';
 import 'models/product_stock.dart';
 import 'screens/community_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/inventory_screen.dart';
+import 'screens/login_screen.dart';
 import 'widgets/confirmation_sheet.dart';
 import 'widgets/origo_header.dart';
 
@@ -43,6 +45,7 @@ class OrigoHomeShell extends StatefulWidget {
 }
 
 class _OrigoHomeShellState extends State<OrigoHomeShell> {
+  MerchantProfile? _currentUser;
   int _selectedTab = 0;
   bool _isOfflineMode = true;
   bool _isListening = false;
@@ -162,15 +165,22 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    if (_currentUser == null) {
+      return LoginScreen(
+        onAuthenticated: (profile) => setState(() => _currentUser = profile),
+      );
+    }
+
     final lowCount = _inventory.where((e) => e.isCritical).length;
 
     return Scaffold(
       body: Column(
         children: [
           OrigoHeader(
-            ownerName: 'Don Pedro',
-            storeLocation: 'Tienda La Esperanza · Comuna 2, Yopal',
+            ownerName: _currentUser!.ownerName,
+            storeLocation: '${_currentUser!.businessName} · ${_currentUser!.zone}',
             isOfflineMode: _isOfflineMode,
+            onLogout: () => setState(() => _currentUser = null),
             onToggleOffline: () {
               setState(() {
                 _isOfflineMode = !_isOfflineMode;

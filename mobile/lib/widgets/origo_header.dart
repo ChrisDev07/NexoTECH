@@ -5,6 +5,7 @@ class OrigoHeader extends StatelessWidget {
   final String storeLocation;
   final bool isOfflineMode;
   final VoidCallback onToggleOffline;
+  final VoidCallback? onLogout;
 
   const OrigoHeader({
     super.key,
@@ -12,6 +13,7 @@ class OrigoHeader extends StatelessWidget {
     required this.storeLocation,
     required this.isOfflineMode,
     required this.onToggleOffline,
+    this.onLogout,
   });
 
   @override
@@ -47,25 +49,37 @@ class OrigoHeader extends StatelessWidget {
                   ),
                 ),
               ),
-              InkWell(
-                onTap: onToggleOffline,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: isOfflineMode
-                        ? const Color(0xFFF59E0B)
-                        : Colors.white.withOpacity(0.22),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    isOfflineMode ? '✈️ Sin Internet' : '🟢 Conectado',
-                    style: TextStyle(
-                      color: isOfflineMode ? const Color(0xFF1C1917) : Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 13,
+              Row(
+                children: [
+                  InkWell(
+                    onTap: onToggleOffline,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isOfflineMode
+                            ? const Color(0xFFF59E0B)
+                            : Colors.white.withOpacity(0.22),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        isOfflineMode ? '✈️ Sin Internet' : '🟢 Conectado',
+                        style: TextStyle(
+                          color: isOfflineMode ? const Color(0xFF1C1917) : Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  if (onLogout != null) ...[
+                    const SizedBox(width: 6),
+                    IconButton(
+                      onPressed: onLogout,
+                      icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 20),
+                      tooltip: 'Cerrar sesión',
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
