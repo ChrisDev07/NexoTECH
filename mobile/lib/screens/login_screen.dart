@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/merchant_profile.dart';
+import '../services/offline_ledger.dart';
 
 class LoginScreen extends StatefulWidget {
+  final OfflineLedgerService ledger;
   final void Function(MerchantProfile profile) onAuthenticated;
 
   const LoginScreen({
     super.key,
+    required this.ledger,
     required this.onAuthenticated,
   });
 
@@ -16,6 +19,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool _isRegister = false;
   bool _habeasAccepted = false;
+  bool _busy = false;
   String _selectedZone = 'Comuna 2, Yopal';
   String? _errorText;
 
@@ -56,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(height: 12),
               Text(
                 '✔ Conocer, actualizar y suprimir tus datos.\n'
-                '✔ Claves protegidas con hash PBKDF2-SHA256 + sal.',
+                '✔ Claves protegidas con hash criptográfico + sal única.',
               ),
             ],
           ),
@@ -71,43 +75,58 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _handleSubmit() {
-    setState(() => _errorText = null);
+  Future<void> _handleSubmit() async {
+    if (_busy) return;
+    setState(() {
+      _errorText = null;
+      _busy = true;
+    });
 
-    if (_isRegister) {
-      if (!_habeasAccepted) {
-        setState(() => _errorText = 'Debes aceptar el Aviso de Privacidad (Ley 1581 de 2012).');
-        return;
-      }
-      if (_ownerCtrl.text.trim().length < 2 || _businessCtrl.text.trim().length < 2) {
-        setState(() => _errorText = 'Completa tu nombre y el nombre de tu negocio.');
-        return;
-      }
-      if (_pinCtrl.text.trim().length < 4) {
-        setState(() => _errorText = 'Crea una clave de 4 a 6 números.');
-        return;
-      }
-      widget.onAuthenticated(
-        MerchantProfile(
-          ownerName: _ownerCtrl.text.trim(),
-          businessName: _businessCtrl.text.trim(),
+    try {
+      if (_isRegister) {
+        final res = await widget.ledger.registerLocalUser(
+          ownerName: _ownerCtrl.text,
+          businessName: _businessCtrl.text,
           zone: _selectedZone,
-          phone: _phoneCtrl.text.trim(),
-        ),
-      );
-    } else {
-      if (_phoneCtrl.text.trim().isEmpty || _pinCtrl.text.trim().length < 4) {
-        setState(() => _errorText = 'Ingresa tu celular y clave numérica.');
-        return;
+          phone: _phoneCtrl.text,
+          pin: _pinCtrl.text,
+          habeasAccepted: _habeasAccepted,
+        );
+        if (!mounted) return;
+        if (res.error != null || res.profile == null) {
+          setState(() => _errorText = res.error ?? 'Error al crear la tienda.');
+          return;
+        }
+        widget.onAuthenticated(res.profile!);
+      } else {
+        final res = await widget.ledger.loginLocalUser(
+          phone: _phoneCtrl.text,
+          pin: _pinCtrl.text,
+        );
+        if (!mounted) return;
+        if (res.error != null || res.profile == null) {
+          setState(() => _errorText = res.error ?? 'Credenciales inválidas.');
+          return;
+        }
+        widget.onAuthenticated(res.profile!);
       }
-      widget.onAuthenticated(
-        MerchantProfile(
-          ownerName: 'Don Pedro',
-          businessName: 'Tienda La Esperanza',
-          zone: 'Comuna 2, Yopal',
-          phone: _phoneCtrl.text.trim(),
-        ),
-      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _handleDemoLogin() async {
+    if (_busy) return;
+    setState(() {
+      _errorText = null;
+      _busy = true;
+    });
+    try {
+      final profile = await widget.ledger.loginDemoUser();
+      if (!mounted) return;
+      widget.onAuthenticated(profile);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -192,7 +211,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
-                        value: _selectedZone,
+                        initialValue: _selectedZone,
                         decoration: const InputDecoration(labelText: '📍 Zona en Casanare'),
                         items: _zones
                             .map((z) => DropdownMenuItem(value: z, child: Text(z)))
@@ -235,7 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         backgroundColor: const Color(0xFF047857),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      onPressed: _handleSubmit,
+                      onPressed: _busy ? null : _handleSubmit,
                       child: Text(
                         _isRegister ? '✨ Crear mi tienda' : '✔ Entrar a mi tienda',
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
@@ -244,14 +263,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (!_isRegister) ...[
                       const SizedBox(height: 10),
                       OutlinedButton(
-                        onPressed: () => widget.onAuthenticated(
-                          const MerchantProfile(
-                            ownerName: 'Don Pedro',
-                            businessName: 'Tienda La Esperanza',
-                            zone: 'Comuna 2, Yopal',
-                            phone: '3101234567',
-                          ),
-                        ),
+                        onPressed: _busy ? null : _handleDemoLogin,
                         child: const Text('⚡ Entrar con cuenta demo (Don Pedro)'),
                       ),
                     ],

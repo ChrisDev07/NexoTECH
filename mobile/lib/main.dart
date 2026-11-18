@@ -63,108 +63,119 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   String _liveTranscript = '';
 
   final List<MovementLog> _recentMovements = [];
+  List<ProductStock> _inventory = [];
 
-  final List<ProductStock> _inventory = [
-    ProductStock(
-      id: 'prod_arroz_casanare',
-      icon: '🌾',
-      name: 'Arroz Casanareño',
-      category: 'Granos y Víveres',
-      unit: 'bultos',
-      openingStock: 20,
-      quantity: 20,
-      minThreshold: 10,
-    ),
-    ProductStock(
-      id: 'prod_aceite_vegetal',
-      icon: '🛢️',
-      name: 'Aceite Vegetal 900ml',
-      category: 'Víveres',
-      unit: 'cajas',
-      openingStock: 10,
-      quantity: 10,
-      minThreshold: 5,
-    ),
-    ProductStock(
-      id: 'prod_panela_criolla',
-      icon: '🟫',
-      name: 'Panela Criolla',
-      category: 'Víveres',
-      unit: 'pacas',
-      openingStock: 15,
-      quantity: 15,
-      minThreshold: 8,
-    ),
-    ProductStock(
-      id: 'prod_papa_pastusa',
-      icon: '🥔',
-      name: 'Papa Pastusa / Criolla',
-      category: 'Perecederos',
-      unit: 'arrobas',
-      openingStock: 12,
-      quantity: 12,
-      minThreshold: 6,
-    ),
-    ProductStock(
-      id: 'prod_abono_triple15',
-      icon: '🌱',
-      name: 'Abono Triple 15',
-      category: 'Agroinsumos',
-      unit: 'bultos',
-      openingStock: 15,
-      quantity: 15,
-      minThreshold: 12,
-    ),
-    ProductStock(
-      id: 'prod_cemento_gris',
-      icon: '🧱',
-      name: 'Cemento Gris 50kg',
-      category: 'Ferretería',
-      unit: 'bultos',
-      openingStock: 30,
-      quantity: 30,
-      minThreshold: 20,
-    ),
-    ProductStock(
-      id: 'prod_sal_marina',
-      icon: '🧂',
-      name: 'Sal Marina Refinada',
-      category: 'Víveres',
-      unit: 'bultos',
-      openingStock: 8,
-      quantity: 8,
-      minThreshold: 5,
-    ),
-    ProductStock(
-      id: 'prod_harina_pan',
-      icon: '🌽',
-      name: 'Harina de Maíz Precocida',
-      category: 'Víveres',
-      unit: 'pacas',
-      openingStock: 12,
-      quantity: 12,
-      minThreshold: 7,
-    ),
-  ];
+  List<ProductStock> _buildBaseCatalog({required bool isDemoStore}) {
+    return [
+      ProductStock(
+        id: 'prod_arroz_casanare',
+        icon: '🌾',
+        name: 'Arroz Casanareño',
+        category: 'Granos y Víveres',
+        unit: 'bultos',
+        openingStock: isDemoStore ? 20 : 0,
+        quantity: isDemoStore ? 20 : 0,
+        minThreshold: 10,
+      ),
+      ProductStock(
+        id: 'prod_aceite_vegetal',
+        icon: '🛢️',
+        name: 'Aceite Vegetal 900ml',
+        category: 'Víveres',
+        unit: 'cajas',
+        openingStock: isDemoStore ? 10 : 0,
+        quantity: isDemoStore ? 10 : 0,
+        minThreshold: 5,
+      ),
+      ProductStock(
+        id: 'prod_panela_criolla',
+        icon: '🟫',
+        name: 'Panela Criolla',
+        category: 'Víveres',
+        unit: 'pacas',
+        openingStock: isDemoStore ? 15 : 0,
+        quantity: isDemoStore ? 15 : 0,
+        minThreshold: 8,
+      ),
+      ProductStock(
+        id: 'prod_papa_pastusa',
+        icon: '🥔',
+        name: 'Papa Pastusa / Criolla',
+        category: 'Perecederos',
+        unit: 'arrobas',
+        openingStock: isDemoStore ? 12 : 0,
+        quantity: isDemoStore ? 12 : 0,
+        minThreshold: 6,
+      ),
+      ProductStock(
+        id: 'prod_abono_triple15',
+        icon: '🌱',
+        name: 'Abono Triple 15',
+        category: 'Agroinsumos',
+        unit: 'bultos',
+        openingStock: isDemoStore ? 15 : 0,
+        quantity: isDemoStore ? 15 : 0,
+        minThreshold: 12,
+      ),
+      ProductStock(
+        id: 'prod_cemento_gris',
+        icon: '🧱',
+        name: 'Cemento Gris 50kg',
+        category: 'Ferretería',
+        unit: 'bultos',
+        openingStock: isDemoStore ? 30 : 0,
+        quantity: isDemoStore ? 30 : 0,
+        minThreshold: 20,
+      ),
+      ProductStock(
+        id: 'prod_sal_marina',
+        icon: '🧂',
+        name: 'Sal Marina Refinada',
+        category: 'Víveres',
+        unit: 'bultos',
+        openingStock: isDemoStore ? 8 : 0,
+        quantity: isDemoStore ? 8 : 0,
+        minThreshold: 5,
+      ),
+      ProductStock(
+        id: 'prod_harina_pan',
+        icon: '🌽',
+        name: 'Harina de Maíz Precocida',
+        category: 'Víveres',
+        unit: 'pacas',
+        openingStock: isDemoStore ? 12 : 0,
+        quantity: isDemoStore ? 12 : 0,
+        minThreshold: 7,
+      ),
+    ];
+  }
 
   @override
   void initState() {
     super.initState();
+    _inventory = _buildBaseCatalog(isDemoStore: false);
     _initServices();
   }
 
   Future<void> _initServices() async {
     await _nlp.loadCatalog();
-    await _loadLedgerFromSqlite();
+
+    // Restaurar sesión activa guardada en SQLite local (funciona sin internet)
+    try {
+      final savedUser = await _ledger.getActiveUser();
+      if (savedUser != null && mounted) {
+        setState(() => _currentUser = savedUser);
+        await _loadLedgerForCurrentUser();
+      }
+    } catch (_) {}
 
     // 1. Escuchar cambios reales de conectividad del celular (Wi-Fi / Datos / Modo Avión)
     _sync.onConnectivityChanged = (bool isOnline) async {
       if (!mounted) return;
       if (!isOnline) {
-        _showSnack('✈️ Sin señal: los movimientos se guardarán localmente en tu celular.');
+        _showSnack('✈️ Sin señal: los cambios se guardarán localmente en tu celular.');
         return;
       }
-      // Esperar brevemente a que Android complete el enrutamiento al desactivar Modo Avión
       await Future.delayed(const Duration(milliseconds: 1500));
       if (!mounted) return;
       await _attemptAutoSync(notifyOnSuccess: true);
@@ -237,27 +248,28 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
 
   Future<void> _attemptAutoSync({required bool notifyOnSuccess}) async {
     final result = await _sync.syncPendingMovements();
-    if (result.syncedCount > 0) {
-      await _loadLedgerFromSqlite();
+    if (result.syncedCount > 0 || result.syncedUsersCount > 0) {
+      await _loadLedgerForCurrentUser();
       if (notifyOnSuccess) {
-        _showSnack(
-          '☁️ ¡Internet detectado! ${result.syncedCount} movimiento${result.syncedCount == 1 ? "" : "s"} subido${result.syncedCount == 1 ? "" : "s"} al servidor.',
-        );
+        final parts = <String>[];
+        if (result.syncedUsersCount > 0) parts.add('tienda sincronizada');
+        if (result.syncedCount > 0) {
+          parts.add('${result.syncedCount} movimiento${result.syncedCount == 1 ? "" : "s"}');
+        }
+        _showSnack('☁️ ¡Internet detectado! Subido al servidor: ${parts.join(" y ")}.');
       }
     }
   }
 
-  Future<void> _loadLedgerFromSqlite() async {
-    final rows = await _ledger.getAllMovements();
+  Future<void> _loadLedgerForCurrentUser() async {
+    final user = _currentUser;
+    if (user == null) return;
+
+    final freshCatalog = _buildBaseCatalog(isDemoStore: user.isDemo);
+    final rows = await _ledger.getAllMovements(user.id);
     final now = DateTime.now();
     final startOfDayMs = DateTime(now.year, now.month, now.day, 0, 0, 0).millisecondsSinceEpoch;
     final endOfDayMs = DateTime(now.year, now.month, now.day, 23, 59, 59, 999).millisecondsSinceEpoch;
-
-    for (final p in _inventory) {
-      p.quantity = p.openingStock;
-      p.todayIn = 0;
-      p.todayOut = 0;
-    }
 
     final logs = <MovementLog>[];
     for (final row in rows) {
@@ -265,7 +277,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
       final isSale = row['type'].toString() == 'OUT';
       final qty = (row['quantity'] as num).toDouble();
       final ts = (row['timestamp'] as num).toInt();
-      final prod = _inventory.where((p) => p.id == pid).firstOrNull;
+      final prod = freshCatalog.where((p) => p.id == pid).firstOrNull;
       if (prod != null) {
         if (isSale) {
           prod.quantity = (prod.quantity - qty).clamp(0, 99999);
@@ -286,13 +298,35 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
         ),
       );
     }
+
     if (mounted) {
       setState(() {
+        _inventory = freshCatalog;
         _recentMovements
           ..clear()
           ..addAll(logs);
       });
     }
+  }
+
+  Future<void> _onUserAuthenticated(MerchantProfile profile) async {
+    setState(() {
+      _currentUser = profile;
+      _selectedTab = 0;
+      _liveTranscript = '';
+    });
+    await _loadLedgerForCurrentUser();
+    await _attemptAutoSync(notifyOnSuccess: true);
+  }
+
+  Future<void> _onLogout() async {
+    await _ledger.setActiveUserId(null);
+    if (!mounted) return;
+    setState(() {
+      _currentUser = null;
+      _recentMovements.clear();
+      _inventory = _buildBaseCatalog(isDemoStore: false);
+    });
   }
 
   Future<void> _toggleMic() async {
@@ -332,14 +366,18 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   }
 
   void _openConfirm(ProductStock product, {bool isSale = true, double qty = 1}) {
+    final user = _currentUser;
+    if (user == null) return;
+
     showOrigoConfirmationSheet(
       context: context,
       product: product,
       initialIsSale: isSale,
       initialQty: qty,
       onConfirm: (confirmedSale, confirmedQty) async {
-        // 1. Siempre guardar primero en SQLite local (synced = 0) -> Cero pérdida de datos
+        // 1. Guardar siempre primero en SQLite aislado por `user.id`
         await _ledger.recordMovement(
+          businessId: user.id,
           productId: product.id,
           productName: product.name,
           isSale: confirmedSale,
@@ -347,18 +385,18 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
           unit: product.unit,
           synced: false,
         );
-        await _loadLedgerFromSqlite();
+        await _loadLedgerForCurrentUser();
         if (mounted) setState(() => _liveTranscript = '');
 
-        // 2. Revisar conectividad REAL del celular y sincronizar automáticamente si hay señal
+        // 2. Verificar conectividad real del celular y subir si hay internet
         final online = await _sync.checkOnlineNow();
         if (!online) {
-          _showSnack('💾 Sin señal: guardado localmente. Se subirá al servidor al tener internet.');
+          _showSnack('💾 Sin señal: guardado en tu tienda local. Se subirá al recuperar internet.');
           return;
         }
 
         final syncRes = await _sync.syncPendingMovements();
-        await _loadLedgerFromSqlite();
+        await _loadLedgerForCurrentUser();
         if (syncRes.reachedServer) {
           _showSnack('✅ ¡Guardado y subido automáticamente al servidor!');
         } else {
@@ -382,7 +420,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Dirección del servidor donde se subirán los datos al tener Wi-Fi o datos móviles:',
+              'Dirección del servidor donde se subirán tus datos al tener Wi-Fi o datos móviles:',
               style: TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 12),
@@ -391,7 +429,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
               keyboardType: TextInputType.url,
               decoration: const InputDecoration(
                 labelText: 'URL del servidor',
-                hintText: 'http://192.168.1.50:8000',
+                hintText: 'http://10.209.55.173:8000',
               ),
             ),
           ],
@@ -407,7 +445,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
               if (url.isNotEmpty) {
                 await _ledger.setServerUrl(url);
                 if (ctx.mounted) Navigator.pop(ctx);
-                _showSnack('✔ Servidor guardado. Intentando sincronizar...');
+                _showSnack('✔ Servidor guardado. Sincronizando...');
                 await _attemptAutoSync(notifyOnSuccess: true);
               }
             },
@@ -422,10 +460,8 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   Widget build(BuildContext context) {
     if (_currentUser == null) {
       return LoginScreen(
-        onAuthenticated: (profile) {
-          setState(() => _currentUser = profile);
-          _attemptAutoSync(notifyOnSuccess: true);
-        },
+        ledger: _ledger,
+        onAuthenticated: _onUserAuthenticated,
       );
     }
 
@@ -438,7 +474,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
             ownerName: _currentUser!.ownerName,
             storeLocation: '${_currentUser!.businessName} · ${_currentUser!.zone}',
             onConfigureServer: _openServerConfigDialog,
-            onLogout: () => setState(() => _currentUser = null),
+            onLogout: _onLogout,
           ),
           Expanded(
             child: IndexedStack(
