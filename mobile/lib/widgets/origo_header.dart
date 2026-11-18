@@ -6,6 +6,7 @@ class OrigoHeader extends StatelessWidget {
   final String documentId;
   final String address;
   final VoidCallback? onConfigureServer;
+  final VoidCallback? onShowPrivacy;
   final VoidCallback? onLogout;
 
   const OrigoHeader({
@@ -15,6 +16,7 @@ class OrigoHeader extends StatelessWidget {
     this.documentId = '',
     this.address = '',
     this.onConfigureServer,
+    this.onShowPrivacy,
     this.onLogout,
   });
 
@@ -53,6 +55,12 @@ class OrigoHeader extends StatelessWidget {
               ),
               Row(
                 children: [
+                  if (onShowPrivacy != null)
+                    IconButton(
+                      onPressed: onShowPrivacy,
+                      icon: const Icon(Icons.shield_outlined, color: Colors.white, size: 21),
+                      tooltip: 'Política de Privacidad (Ley 1581)',
+                    ),
                   if (onConfigureServer != null)
                     IconButton(
                       onPressed: onConfigureServer,

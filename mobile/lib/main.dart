@@ -12,6 +12,7 @@ import 'services/offline_voice_service.dart';
 import 'services/sync_service.dart';
 import 'widgets/confirmation_sheet.dart';
 import 'widgets/origo_header.dart';
+import 'widgets/privacy_dialog.dart';
 
 void main() {
   runApp(const OrigoApp());
@@ -672,6 +673,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
             storeLocation: '${_currentUser!.businessName} · ${_currentUser!.zone}',
             documentId: _currentUser!.documentId,
             address: _currentUser!.address,
+            onShowPrivacy: () => showOrigoPrivacyDialog(context),
             onConfigureServer: _openServerConfigDialog,
             onLogout: _onLogout,
           ),

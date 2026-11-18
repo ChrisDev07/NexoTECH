@@ -64,17 +64,17 @@ fn random_token() -> String {
 
 pub fn privacy_policy_ley_1581() -> PrivacyPolicy {
     PrivacyPolicy {
-        title: "Aviso de Privacidad y Protección de Datos (Ley 1581 de 2012)".into(),
-        summary: "En Origo aplicamos el principio de minimización de datos: solo solicitamos lo estrictamente necesario para operar tu inventario y compras colectivas (tu nombre, negocio, zona y celular). Nunca vendemos tus datos personales a terceros.".into(),
+        title: "Aviso de Privacidad y Política de Tratamiento de Datos (Ley 1581 de 2012 y Decreto 1074 de 2015)".into(),
+        summary: "En cumplimiento de la Ley 1581 de 2012 y el Decreto 1074 de 2015, le informamos que los datos personales suministrados serán tratados para gestionar su registro, operación comercial, inventario, ventas, pedidos y contacto dentro de esta aplicación. Frente a los datos de clientes finales registrados por los comercios, la MiPyme usuaria actúa como Responsable del Tratamiento y la Gobernación de Casanare, como operadora de la plataforma, actúa como Encargada del Tratamiento.".into(),
         roles: PrivacyRoles {
-            responsable: "La MiPyme usuaria actúa como responsable de los datos de su negocio y de sus clientes.".into(),
-            encargado: "La Dirección TIC de la Gobernación de Casanare y la plataforma Origo actúan como encargados del tratamiento técnico seguro.".into(),
+            responsable: "La MiPyme usuaria actúa como Responsable del Tratamiento frente a los datos de sus clientes y negocio.".into(),
+            encargado: "La Gobernación de Casanare (Dirección TIC) / plataforma Origo actúa como Encargada del Tratamiento técnico seguro.".into(),
         },
         rights: vec![
-            "Conocer y consultar gratuitamente tus datos almacenados en cualquier momento.".into(),
-            "Actualizar o corregir el nombre de tu negocio, zona o datos de contacto.".into(),
-            "Revocar esta autorización y solicitar la eliminación de tu cuenta.".into(),
-            "Tu clave/PIN se protege mediante cifrado unidireccional PBKDF2-SHA256 con sal única.".into(),
+            "Finalidades y Derechos: Declaro haber sido informado(a) de que mis datos serán utilizados exclusivamente para gestionar pedidos, ventas, entregas, control de cartera/fiados y comunicación comercial.".into(),
+            "Es facultativo responder preguntas sobre datos sensibles.".into(),
+            "Puedo ejercer gratuitamente mis derechos a conocer, actualizar, rectificar y suprimir mis datos conforme a la Política de Tratamiento de Datos Personales disponible en la aplicación y en www.casanare.gov.co.".into(),
+            "La clave de acceso (PIN) se protege mediante hash unidireccional PBKDF2-SHA256 (100.000 iteraciones) con sal criptográfica única.".into(),
         ],
     }
 }

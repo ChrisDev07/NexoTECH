@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/merchant_profile.dart';
 import '../services/offline_ledger.dart';
 import '../services/sync_service.dart';
+import '../widgets/privacy_dialog.dart';
 
 class LoginScreen extends StatefulWidget {
   final OfflineLedgerService ledger;
@@ -57,39 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showPrivacyDialog() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('🛡️ Aviso de Privacidad (Ley 1581)'),
-        content: const SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'En Origo aplicamos minimización de datos: solo solicitamos tu nombre, negocio, zona y celular para operar tu inventario y compras colectivas.',
-              ),
-              SizedBox(height: 12),
-              Text(
-                'Responsable: La MiPyme usuaria.\nEncargado: Dirección TIC Gobernación de Casanare / Origo.',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              SizedBox(height: 12),
-              Text(
-                '✔ Conocer, actualizar y suprimir tus datos.\n'
-                '✔ Claves protegidas con hash criptográfico + sal única.',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Entendido'),
-          ),
-        ],
-      ),
-    );
+    showOrigoPrivacyDialog(context);
   }
 
   Future<void> _handleSubmit() async {
@@ -288,18 +257,67 @@ class _LoginScreenState extends State<LoginScreen> {
                       decoration: const InputDecoration(labelText: '🔐 Clave numérica (4–6 dígitos)'),
                     ),
                     if (_isRegister) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF5F5F4),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFE7E5E4)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Text('🛡️ ', style: TextStyle(fontSize: 14)),
+                                Expanded(
+                                  child: Text(
+                                    'AVISO DE PRIVACIDAD (Ley 1581 / Dec. 1074)',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w900,
+                                      color: Color(0xFF1C1917),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'En cumplimiento de la Ley 1581 de 2012 y el Decreto 1074 de 2015, le informamos que los datos personales suministrados serán tratados para gestionar su registro, operación comercial, inventario, ventas, pedidos y contacto dentro de esta aplicación. Frente a los datos de clientes finales registrados por los comercios, la MiPyme usuaria actúa como Responsable del Tratamiento y la Gobernación de Casanare, como operadora de la plataforma, actúa como Encargada del Tratamiento. Usted puede ejercer sus derechos a conocer, actualizar, rectificar y suprimir sus datos, así como consultar nuestra Política de Tratamiento de Datos Personales directamente en esta aplicación.',
+                              style: TextStyle(
+                                fontSize: 11,
+                                height: 1.35,
+                                color: Color(0xFF57534E),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            InkWell(
+                              onTap: _showPrivacyDialog,
+                              child: const Text(
+                                '📄 Ver Política de Tratamiento de Datos Personales (enlace offline)',
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF047857),
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 6),
                       CheckboxListTile(
                         contentPadding: EdgeInsets.zero,
                         value: _habeasAccepted,
                         onChanged: (v) => setState(() => _habeasAccepted = v ?? false),
+                        controlAffinity: ListTileControlAffinity.leading,
                         title: const Text(
-                          'Acepto el Aviso de Privacidad (Ley 1581 de 2012)',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                          'He leído el Aviso de Privacidad y autorizo de manera previa, expresa e informada el tratamiento de mis datos personales conforme a la Política de Tratamiento de Datos Personales.',
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
                         ),
-                      ),
-                      TextButton(
-                        onPressed: _showPrivacyDialog,
-                        child: const Text('🛡️ Leer Política de Privacidad completa'),
                       ),
                     ],
                     const SizedBox(height: 12),
