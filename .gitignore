@@ -52,4 +52,6 @@ plan.md
 *.pdf
 
 # Rust
+target/
+backend/target/
 sync_core/target/

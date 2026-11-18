@@ -52,16 +52,18 @@ MyPymes/
 │   ├── catalog.json              # Catálogo tipificado con unidades regionales de Casanare
 │   ├── parser.py                 # Normalización léxica, extracción de entidades y fuzzy matching
 │   └── test_parser.py            # Suite de pruebas unitarias de interpretación lingüística
-├── backend/                      # Servicios modulares (Event Sourcing + Compras Colectivas)
-│   ├── models.py                 # Contratos y modelos de dominio
-│   ├── auth.py                   # Autenticación PBKDF2 + sal y Ley 1581 de 2012
-│   ├── ledger.py                 # Libro mayor inmutable SQLite y corte diario (00:00–23:59)
-│   ├── collective.py             # Motor independiente de central de compras colectivas
+├── backend/                      # Backend API REST en Rust (Tokio + Axum + SQLite/PostgreSQL-ready)
+│   ├── Cargo.toml                # Manifiesto del crate origo-backend (binario origo-server)
 │   ├── schema_postgres.sql       # Esquema central PostgreSQL 16+ (tablas, vistas e índices)
-│   ├── server.py                 # Servidor REST y despachador de recursos estáticos
-│   ├── simulate_workflow.py      # Validación E2E del flujo operativo y red colectiva
-│   ├── test_ledger.py            # Pruebas unitarias de integridad y corte diario
-│   ├── test_auth.py              # Pruebas unitarias de seguridad y Habeas Data
+│   ├── src/
+│   │   ├── main.rs               # Servidor HTTP Axum y despacho de archivos estáticos
+│   │   ├── lib.rs                # Exportación de módulos del dominio
+│   │   ├── models.rs             # Contratos y modelos de dominio (Event Sourcing + DTOs)
+│   │   ├── nlp.rs                # Motor NLP heurístico regional en Rust (modismos de Casanare)
+│   │   ├── auth.rs               # Autenticación PBKDF2-SHA256 + PIN móvil y Ley 1581 de 2012
+│   │   ├── ledger.rs             # Libro mayor inmutable SQLite y corte diario (00:00–23:59)
+│   │   ├── collective.rs         # Motor de central de compras colectivas
+│   │   └── routes.rs             # Endpoints REST + sincronización offline idempotente + pruebas E2E
 │   └── static/                   # Interfaz web modularizada
 │       ├── index.html            # Estructura semántica limpia
 │       ├── css/styles.css        # Sistema de diseño accesible (WCAG AAA)
@@ -88,26 +90,25 @@ MyPymes/
 
 ## ⚡ 4. Guía de Ejecución y Validación Técnica
 
-La arquitectura del prototipo fue concebida para garantizar una validación técnica ágil e independiente, ejecutándose de forma nativa bajo **Python 3.8+** sin dependencias externas requeridas.
+El backend principal de **Origo** está implementado en **Rust (Tokio + Axum + rusqlite)** para ofrecer alto rendimiento, seguridad de memoria y consumo mínimo de recursos, manteniendo 100% compatibilidad con la app móvil Android (Flutter + Vosk offline) y la consola web.
 
-### 4.1. Verificación del Motor Lingüístico Local (NLP Heurístico):
-Ejecución de la suite de pruebas automatizadas para comprobar el reconocimiento de modismos regionales, normalización numérica y extracción estructurada de entidades:
+### 4.1. Suite de Pruebas Unitarias e Integración E2E (Rust):
+Valida el motor NLP casanareño, la seguridad PBKDF2 + Ley 1581, el corte diario `00:00–23:59`, las compras colectivas y el aislamiento multi-tienda de sincronización offline:
+```bash
+cd backend && cargo test
+```
+
+### 4.2. Inicialización del Servidor REST y Consola Web (Rust):
+Compila e inicia el servidor de alto rendimiento (escucha en `0.0.0.0:8000` para aceptar conexiones locales y de celulares en la red Wi-Fi):
+```bash
+cd backend && cargo run --release
+```
+Acceso a la consola operativa en: `http://localhost:8000` (health check en `http://localhost:8000/api/health`).
+
+### 4.3. Verificación Independiente del Catálogo NLP (Opcional - Python):
 ```bash
 python3 core_nlp/test_parser.py
 ```
-
-### 4.2. Simulación de Flujo Operativo Integral (Modo Desconectado y Red Colectiva):
-Demostración del ciclo completo de inventario bajo arquitectura Event Sourcing, cálculo reactivo de existencias críticas y consolidación de demanda mayorista entre comercios geolocalizados:
-```bash
-python3 backend/simulate_workflow.py
-```
-
-### 4.3. Inicialización del Servidor y Consola de Monitoreo:
-Despliegue del servicio local para interacción en tiempo real mediante interfaz gráfica:
-```bash
-python3 backend/server.py
-```
-Acceso a la consola operativa en: `http://localhost:8000`
 
 ---
 
