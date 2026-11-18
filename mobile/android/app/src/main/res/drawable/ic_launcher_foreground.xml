@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Anillo exterior "O" de Origo (comunidad + economía circular) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FEF3C7"
+        android:strokeWidth="5.5"
+        android:pathData="M54,24 A30,30 0 1,0 54,84 A30,30 0 1,0 54,24 Z" />
+
+    <!-- Ondas sutiles de voz (izquierda y derecha) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FCD34D"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M34,47 Q31,54 34,61" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FCD34D"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M74,47 Q77,54 74,61" />
+
+    <!-- Tallo central dorado de espiga (arroz / agro de Casanare) -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F59E0B"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:pathData="M54,74 L54,36" />
+
+    <!-- Granos superiores -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M54,33 C50,37 50,43 54,46 C58,43 58,37 54,33 Z" />
+
+    <!-- Granos izquierdos -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M52,47 C45,45 41,49 43,54 C47,55 51,52 52,47 Z" />
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M52,57 C44,56 41,61 44,66 C48,66 52,62 52,57 Z" />
+
+    <!-- Granos derechos -->
+    <path
+        android:fillColor="#F59E0B"
+        android:pathData="M56,47 C63,45 67,49 65,54 C61,55 57,52 56,47 Z" />
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M56,57 C64,56 67,61 64,66 C60,66 56,62 56,57 Z" />
+</vector>
