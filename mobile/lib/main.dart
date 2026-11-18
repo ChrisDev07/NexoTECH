@@ -60,6 +60,8 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   bool _isVoiceModelReady = false;
   bool _isHistoryExpanded = true;
   int _extraCollectiveBultos = 0;
+  Map<String, dynamic>? _collectiveData;
+  bool _loadingCollective = false;
   String _liveTranscript = '';
 
   final List<MovementLog> _recentMovements = [];
@@ -185,6 +187,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
       final onlineNow = await _sync.init();
       if (onlineNow) {
         await _attemptAutoSync(notifyOnSuccess: false);
+        await _refreshCollective();
       }
     } catch (_) {}
 
@@ -248,16 +251,85 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
 
   Future<void> _attemptAutoSync({required bool notifyOnSuccess}) async {
     final result = await _sync.syncPendingMovements();
-    if (result.syncedCount > 0 || result.syncedUsersCount > 0) {
+    if (result.syncedCount > 0 ||
+        result.syncedUsersCount > 0 ||
+        result.syncedProductsCount > 0) {
       await _loadLedgerForCurrentUser();
       if (notifyOnSuccess) {
         final parts = <String>[];
         if (result.syncedUsersCount > 0) parts.add('tienda sincronizada');
+        if (result.syncedProductsCount > 0) {
+          parts.add('${result.syncedProductsCount} producto${result.syncedProductsCount == 1 ? "" : "s"}');
+        }
         if (result.syncedCount > 0) {
           parts.add('${result.syncedCount} movimiento${result.syncedCount == 1 ? "" : "s"}');
         }
-        _showSnack('☁️ ¡Internet detectado! Subido al servidor: ${parts.join(" y ")}.');
+        _showSnack('☁️ ¡Internet detectado! Subido al servidor: ${parts.join(", ")}.');
       }
+    }
+    if (result.reachedServer) {
+      await _refreshCollective();
+    }
+  }
+
+  Future<void> _refreshCollective() async {
+    if (_loadingCollective) return;
+    if (mounted) setState(() => _loadingCollective = true);
+    try {
+      final data = await _sync.fetchCollectiveSummary();
+      if (mounted && data != null) {
+        setState(() => _collectiveData = data);
+      }
+    } finally {
+      if (mounted) setState(() => _loadingCollective = false);
+    }
+  }
+
+  Future<void> _handleJoinCollective() async {
+    final user = _currentUser;
+    if (user == null) return;
+    if (mounted) setState(() => _loadingCollective = true);
+    try {
+      final live = await _sync.joinCollectiveOrder(user: user, quantity: 10.0);
+      if (!mounted) return;
+      if (live != null) {
+        setState(() => _collectiveData = live);
+        _showSnack('🎉 ¡Sumaste +10 bultos reales al pedido de ${user.zone} en el servidor!');
+      } else {
+        setState(() => _extraCollectiveBultos += 10);
+        _showSnack('✈️ Sin señal: sumados +10 bultos en vista local.');
+      }
+    } finally {
+      if (mounted) setState(() => _loadingCollective = false);
+    }
+  }
+
+  Future<void> _handleAddCustomProduct(NewProductInput input) async {
+    final user = _currentUser;
+    if (user == null) return;
+
+    await _ledger.addCustomProduct(
+      businessId: user.id,
+      name: input.name,
+      category: input.category,
+      unit: input.unit,
+      minThreshold: input.minThreshold,
+      synonyms: input.synonyms,
+      synced: false,
+    );
+    await _loadLedgerForCurrentUser();
+
+    final online = await _sync.checkOnlineNow();
+    if (!online) {
+      _showSnack('💾 "${input.name}" guardado en tu bodega local y listo para dictar por voz.');
+      return;
+    }
+
+    final syncRes = await _sync.syncPendingMovements();
+    if (syncRes.reachedServer) {
+      _showSnack('✅ "${input.name}" agregado a tu bodega, voz offline y servidor Rust.');
+    } else {
+      _showSnack('💾 "${input.name}" guardado localmente (se subirá al conectar).');
     }
   }
 
@@ -266,6 +338,24 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
     if (user == null) return;
 
     final freshCatalog = _buildBaseCatalog(isDemoStore: user.isDemo);
+    final customRows = await _ledger.getCustomProducts(user.id);
+    _nlp.setCustomProducts(customRows);
+
+    for (final cp in customRows) {
+      freshCatalog.add(
+        ProductStock(
+          id: cp['id'].toString(),
+          icon: '📦',
+          name: cp['name'].toString(),
+          category: (cp['category'] ?? 'Mi Tienda').toString(),
+          unit: (cp['unit'] ?? 'unidades').toString(),
+          openingStock: 0,
+          quantity: 0,
+          minThreshold: (cp['min_threshold'] as num?)?.toDouble() ?? 5.0,
+        ),
+      );
+    }
+
     final rows = await _ledger.getAllMovements(user.id);
     final now = DateTime.now();
     final startOfDayMs = DateTime(now.year, now.month, now.day, 0, 0, 0).millisecondsSinceEpoch;
@@ -317,6 +407,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
     });
     await _loadLedgerForCurrentUser();
     await _attemptAutoSync(notifyOnSuccess: true);
+    await _refreshCollective();
   }
 
   Future<void> _onLogout() async {
@@ -461,6 +552,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
     if (_currentUser == null) {
       return LoginScreen(
         ledger: _ledger,
+        sync: _sync,
         onAuthenticated: _onUserAuthenticated,
       );
     }
@@ -494,13 +586,16 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
                 InventoryScreen(
                   inventory: _inventory,
                   onSelectProduct: (p) => _openConfirm(p, isSale: true, qty: 1),
+                  onAddProduct: _handleAddCustomProduct,
                 ),
                 CommunityScreen(
-                  extraBultos: _extraCollectiveBultos,
-                  onJoinOrder: () {
-                    setState(() => _extraCollectiveBultos += 10);
-                    _showSnack('🎉 ¡Sumaste +10 bultos al pedido comunitario!');
-                  },
+                  zone: _currentUser!.zone,
+                  currentBusinessId: _currentUser!.id,
+                  liveData: _collectiveData,
+                  localExtraBultos: _extraCollectiveBultos,
+                  isLoading: _loadingCollective,
+                  onRefresh: _refreshCollective,
+                  onJoinOrder: _handleJoinCollective,
                 ),
               ],
             ),
@@ -511,7 +606,10 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
         selectedIndex: _selectedTab,
         backgroundColor: Colors.white,
         indicatorColor: const Color(0xFFD1FAE5),
-        onDestinationSelected: (idx) => setState(() => _selectedTab = idx),
+        onDestinationSelected: (idx) {
+          setState(() => _selectedTab = idx);
+          if (idx == 2) _refreshCollective();
+        },
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_rounded), label: 'Inicio'),
           NavigationDestination(icon: Icon(Icons.inventory_2_rounded), label: 'Bodega'),

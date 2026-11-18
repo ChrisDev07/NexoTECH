@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import '../models/merchant_profile.dart';
 import '../services/offline_ledger.dart';
+import '../services/sync_service.dart';
 
 class LoginScreen extends StatefulWidget {
   final OfflineLedgerService ledger;
+  final AutoSyncService sync;
   final void Function(MerchantProfile profile) onAuthenticated;
 
   const LoginScreen({
     super.key,
     required this.ledger,
+    required this.sync,
     required this.onAuthenticated,
   });
 
@@ -99,16 +102,29 @@ class _LoginScreenState extends State<LoginScreen> {
         }
         widget.onAuthenticated(res.profile!);
       } else {
-        final res = await widget.ledger.loginLocalUser(
+        // 1. Si hay internet, validar primero contra el servidor Rust y descargar movimientos/productos
+        final remote = await widget.sync.loginOnlineAndPull(
           phone: _phoneCtrl.text,
           pin: _pinCtrl.text,
         );
         if (!mounted) return;
-        if (res.error != null || res.profile == null) {
-          setState(() => _errorText = res.error ?? 'Credenciales inválidas.');
+        if (remote.profile != null) {
+          widget.onAuthenticated(remote.profile!);
           return;
         }
-        widget.onAuthenticated(res.profile!);
+        // Si el servidor respondió error explícito (401), verificar si la cuenta existe offline local sin sincronizar
+        final local = await widget.ledger.loginLocalUser(
+          phone: _phoneCtrl.text,
+          pin: _pinCtrl.text,
+        );
+        if (!mounted) return;
+        if (local.profile != null) {
+          widget.onAuthenticated(local.profile!);
+          return;
+        }
+        setState(
+          () => _errorText = remote.error ?? local.error ?? 'Credenciales inválidas.',
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);

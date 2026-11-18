@@ -37,6 +37,7 @@ class RegionalNlpService {
   List<String> _units = [];
   List<String> _inKeywords = [];
   List<String> _outKeywords = [];
+  List<Map<String, dynamic>> _baseProducts = [];
   List<Map<String, dynamic>> _products = [];
   bool _loaded = false;
 
@@ -51,8 +52,36 @@ class RegionalNlpService {
     _outKeywords = (data['intentions']['OUT'] as List)
         .map((e) => normalizeText(e.toString()))
         .toList();
-    _products = List<Map<String, dynamic>>.from(data['products'] as List);
+    _baseProducts = List<Map<String, dynamic>>.from(data['products'] as List);
+    _products = List<Map<String, dynamic>>.from(_baseProducts);
     _loaded = true;
+  }
+
+  /// Combina el catálogo regional base con los productos personalizados de la tienda activa.
+  void setCustomProducts(List<Map<String, dynamic>> customProducts) {
+    final merged = List<Map<String, dynamic>>.from(_baseProducts);
+    for (final cp in customProducts) {
+      final synRaw = cp['synonyms']?.toString() ?? '';
+      final synList = synRaw
+          .split(',')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final entry = {
+        'id': cp['id'].toString(),
+        'name': cp['name'].toString(),
+        'category': cp['category']?.toString() ?? 'Mi Tienda',
+        'default_unit': cp['unit']?.toString() ?? 'unidades',
+        'synonyms': synList.isEmpty ? [cp['name'].toString().toLowerCase()] : synList,
+      };
+      final idx = merged.indexWhere((p) => p['id'] == entry['id']);
+      if (idx >= 0) {
+        merged[idx] = entry;
+      } else {
+        merged.add(entry);
+      }
+    }
+    _products = merged;
   }
 
   static String normalizeText(String input) {

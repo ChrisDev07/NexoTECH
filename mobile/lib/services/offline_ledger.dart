@@ -39,7 +39,7 @@ class OfflineLedgerService {
     final dbPath = p.join(await getDatabasesPath(), _dbName);
     _db = await openDatabase(
       dbPath,
-      version: 3,
+      version: 4,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE local_users (
@@ -66,6 +66,19 @@ class OfflineLedgerService {
             unit TEXT NOT NULL,
             timestamp INTEGER NOT NULL,
             synced INTEGER NOT NULL
+          )
+        ''');
+        await db.execute('''
+          CREATE TABLE custom_products (
+            id TEXT PRIMARY KEY,
+            business_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            category TEXT NOT NULL,
+            unit TEXT NOT NULL,
+            min_threshold REAL NOT NULL,
+            synonyms TEXT NOT NULL,
+            synced INTEGER NOT NULL,
+            created_at INTEGER NOT NULL
           )
         ''');
         await db.execute('''
@@ -108,6 +121,21 @@ class OfflineLedgerService {
             );
           }
           await _seedDemoUser(db);
+        }
+        if (oldVersion < 4) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS custom_products (
+              id TEXT PRIMARY KEY,
+              business_id TEXT NOT NULL,
+              name TEXT NOT NULL,
+              category TEXT NOT NULL,
+              unit TEXT NOT NULL,
+              min_threshold REAL NOT NULL,
+              synonyms TEXT NOT NULL,
+              synced INTEGER NOT NULL,
+              created_at INTEGER NOT NULL
+            )
+          ''');
         }
       },
     );
@@ -270,6 +298,155 @@ class OfflineLedgerService {
     final batch = db.batch();
     for (final id in ids) {
       batch.update('local_users', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Guarda/actualiza en SQLite local un usuario autenticado contra el servidor Rust.
+  Future<MerchantProfile> upsertSyncedRemoteUser({
+    required String id,
+    required String phone,
+    required String pin,
+    required String ownerName,
+    required String businessName,
+    required String zone,
+  }) async {
+    final db = await database;
+    final cleanPhone = sanitizePhone(phone);
+    final salt = _generateSaltHex();
+    final hash = _hashPin(pin.trim(), salt);
+
+    final row = {
+      'id': id,
+      'phone': cleanPhone,
+      'owner_name': ownerName,
+      'business_name': businessName,
+      'zone': zone,
+      'pin_salt': salt,
+      'pin_hash': hash,
+      'habeas_data_accepted': 1,
+      'synced': 1,
+      'created_at': DateTime.now().millisecondsSinceEpoch,
+    };
+    await db.insert('local_users', row, conflictAlgorithm: ConflictAlgorithm.replace);
+    await setActiveUserId(id);
+    return _rowToProfile(row);
+  }
+
+  // --- PRODUCTOS PERSONALIZADOS POR TIENDA ---
+
+  Future<Map<String, dynamic>> addCustomProduct({
+    required String businessId,
+    required String name,
+    required String category,
+    required String unit,
+    required double minThreshold,
+    required List<String> synonyms,
+    String? id,
+    bool synced = false,
+  }) async {
+    final db = await database;
+    final prodId = id ?? 'prod_custom_${_uuid.v4().replaceAll('-', '').substring(0, 8)}';
+    final synList = synonyms.where((s) => s.trim().isNotEmpty).toList();
+    if (synList.isEmpty) synList.add(name.trim().toLowerCase());
+
+    final row = {
+      'id': prodId,
+      'business_id': businessId,
+      'name': name.trim(),
+      'category': category.trim().isEmpty ? 'Mi Tienda' : category.trim(),
+      'unit': unit.trim().isEmpty ? 'unidades' : unit.trim().toLowerCase(),
+      'min_threshold': minThreshold > 0 ? minThreshold : 5.0,
+      'synonyms': synList.join(','),
+      'synced': synced ? 1 : 0,
+      'created_at': DateTime.now().millisecondsSinceEpoch,
+    };
+    await db.insert('custom_products', row, conflictAlgorithm: ConflictAlgorithm.replace);
+    return row;
+  }
+
+  Future<List<Map<String, dynamic>>> getCustomProducts(String businessId) async {
+    final db = await database;
+    return db.query(
+      'custom_products',
+      where: 'business_id = ?',
+      whereArgs: [businessId],
+      orderBy: 'created_at ASC',
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getPendingCustomProducts() async {
+    final db = await database;
+    return db.query('custom_products', where: 'synced = ?', whereArgs: [0]);
+  }
+
+  Future<void> markProductsSynced(List<String> ids) async {
+    if (ids.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final id in ids) {
+      batch.update('custom_products', {'synced': 1}, where: 'id = ?', whereArgs: [id]);
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> importRemoteCustomProducts(
+    String businessId,
+    List<Map<String, dynamic>> remoteProducts,
+  ) async {
+    if (remoteProducts.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final p in remoteProducts) {
+      final synRaw = p['synonyms'];
+      final synStr = synRaw is List
+          ? synRaw.map((e) => e.toString()).join(',')
+          : (synRaw?.toString() ?? p['name'].toString().toLowerCase());
+      batch.insert(
+        'custom_products',
+        {
+          'id': p['id'].toString(),
+          'business_id': businessId,
+          'name': p['name'].toString(),
+          'category': (p['category'] ?? 'Mi Tienda').toString(),
+          'unit': (p['default_unit'] ?? p['unit'] ?? 'unidades').toString(),
+          'min_threshold': (p['min_threshold'] as num?)?.toDouble() ?? 5.0,
+          'synonyms': synStr,
+          'synced': 1,
+          'created_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  Future<void> importRemoteMovements(
+    String businessId,
+    List<Map<String, dynamic>> remoteMoves,
+  ) async {
+    if (remoteMoves.isEmpty) return;
+    final db = await database;
+    final batch = db.batch();
+    for (final m in remoteMoves) {
+      final rawTs = (m['timestamp'] as num?)?.toDouble() ??
+          (DateTime.now().millisecondsSinceEpoch / 1000.0);
+      final tsMs = rawTs < 1e11 ? (rawTs * 1000).round() : rawTs.round();
+      batch.insert(
+        'movements',
+        {
+          'id': m['id'].toString(),
+          'business_id': (m['business_id'] ?? businessId).toString(),
+          'product_id': m['product_id'].toString(),
+          'product_name': (m['product_name'] ?? '').toString(),
+          'type': m['type'].toString(),
+          'quantity': (m['quantity'] as num).toDouble(),
+          'unit': (m['unit'] ?? 'unidades').toString(),
+          'timestamp': tsMs,
+          'synced': 1,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
     }
     await batch.commit(noResult: true);
   }

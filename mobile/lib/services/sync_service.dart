@@ -1,24 +1,40 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import '../models/merchant_profile.dart';
 import 'offline_ledger.dart';
 
 class SyncResult {
   final bool reachedServer;
   final int syncedUsersCount;
+  final int syncedProductsCount;
   final int syncedCount;
   final int pendingRemaining;
 
   const SyncResult({
     required this.reachedServer,
     this.syncedUsersCount = 0,
+    this.syncedProductsCount = 0,
     required this.syncedCount,
     required this.pendingRemaining,
   });
 }
 
-/// Monitorea la conectividad real del celular (Wi-Fi / Datos / Modo Avión)
-/// y sincroniza automáticamente cuentas creadas offline y movimientos locales con el servidor.
+class RemoteLoginResult {
+  final MerchantProfile? profile;
+  final String? error;
+  final bool serverUnreachable;
+
+  const RemoteLoginResult({
+    this.profile,
+    this.error,
+    this.serverUnreachable = false,
+  });
+}
+
+/// Monitorea la conectividad real del celular (Wi-Fi / Datos / Modo Avión),
+/// sincroniza usuarios, productos personalizados y movimientos con el backend Rust,
+/// y conecta Login y Comunidad en vivo cuando hay señal.
 class AutoSyncService {
   static const MethodChannel _networkChannel = MethodChannel('co.nexotech.origo/network');
   final OfflineLedgerService _ledger;
@@ -66,7 +82,95 @@ class AutoSyncService {
     }
   }
 
-  /// Sincroniza primero tiendas nuevas creadas offline y luego movimientos pendientes.
+  /// Inicia sesión contra el backend Rust si hay internet, guarda la cuenta en SQLite
+  /// y descarga (pull) sus productos personalizados y movimientos existentes.
+  Future<RemoteLoginResult> loginOnlineAndPull({
+    required String phone,
+    required String pin,
+  }) async {
+    final online = await checkOnlineNow();
+    if (!online) {
+      return const RemoteLoginResult(serverUnreachable: true);
+    }
+
+    try {
+      final baseUrl = await _ledger.getServerUrl();
+      final resp = await http
+          .post(
+            Uri.parse('$baseUrl/api/auth/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'phone': OfflineLedgerService.sanitizePhone(phone),
+              'pin': pin.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+
+      if (resp.statusCode == 200) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        final token = data['token']?.toString() ?? '';
+        final u = data['user'] as Map<String, dynamic>;
+
+        final profile = await _ledger.upsertSyncedRemoteUser(
+          id: u['id'].toString(),
+          phone: u['phone'].toString(),
+          pin: pin,
+          ownerName: u['owner_name'].toString(),
+          businessName: u['business_name'].toString(),
+          zone: u['zone'].toString(),
+        );
+
+        // Descargar productos propios y movimientos desde el servidor Rust
+        if (token.isNotEmpty) {
+          await _pullStoreDataFromServer(baseUrl, token, profile.id);
+        }
+
+        return RemoteLoginResult(profile: profile);
+      } else if (resp.statusCode == 401 || resp.statusCode == 400) {
+        final data = jsonDecode(resp.body) as Map<String, dynamic>;
+        return RemoteLoginResult(
+          error: data['error']?.toString() ?? 'Celular o clave incorrectos.',
+        );
+      }
+      return const RemoteLoginResult(serverUnreachable: true);
+    } catch (_) {
+      return const RemoteLoginResult(serverUnreachable: true);
+    }
+  }
+
+  Future<void> _pullStoreDataFromServer(
+    String baseUrl,
+    String token,
+    String businessId,
+  ) async {
+    final headers = {'Authorization': 'Bearer $token'};
+    try {
+      final prodResp = await http
+          .get(Uri.parse('$baseUrl/api/products'), headers: headers)
+          .timeout(const Duration(seconds: 5));
+      if (prodResp.statusCode == 200) {
+        final data = jsonDecode(prodResp.body) as Map<String, dynamic>;
+        final list = (data['custom_products'] as List? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .toList();
+        await _ledger.importRemoteCustomProducts(businessId, list);
+      }
+    } catch (_) {}
+
+    try {
+      final movResp = await http
+          .get(Uri.parse('$baseUrl/api/movements'), headers: headers)
+          .timeout(const Duration(seconds: 5));
+      if (movResp.statusCode == 200) {
+        final list = (jsonDecode(movResp.body) as List? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .toList();
+        await _ledger.importRemoteMovements(businessId, list);
+      }
+    } catch (_) {}
+  }
+
+  /// Sincroniza en orden: 1) cuentas offline, 2) productos propios, 3) movimientos pendientes.
   Future<SyncResult> syncPendingMovements() async {
     if (_isSyncing) {
       final pending = await _ledger.getPendingMovements();
@@ -74,9 +178,16 @@ class AutoSyncService {
     }
 
     final pendingUsers = await _ledger.getPendingUsers();
+    final pendingProducts = await _ledger.getPendingCustomProducts();
     final pendingMoves = await _ledger.getPendingMovements();
-    if (pendingUsers.isEmpty && pendingMoves.isEmpty) {
-      return const SyncResult(reachedServer: true, syncedUsersCount: 0, syncedCount: 0, pendingRemaining: 0);
+    if (pendingUsers.isEmpty && pendingProducts.isEmpty && pendingMoves.isEmpty) {
+      return const SyncResult(
+        reachedServer: true,
+        syncedUsersCount: 0,
+        syncedProductsCount: 0,
+        syncedCount: 0,
+        pendingRemaining: 0,
+      );
     }
 
     final online = await checkOnlineNow();
@@ -86,18 +197,18 @@ class AutoSyncService {
 
     _isSyncing = true;
     int syncedUsers = 0;
+    int syncedProducts = 0;
     int syncedMoves = 0;
     bool reached = false;
 
     try {
       final baseUrl = await _ledger.getServerUrl();
 
-      // 1. Subir tiendas creadas sin internet primero (para mantener integridad referencial)
+      // 1. Subir tiendas creadas sin internet primero
       if (pendingUsers.isNotEmpty) {
-        final usersUri = Uri.parse('$baseUrl/api/sync/users');
         final usersResp = await http
             .post(
-              usersUri,
+              Uri.parse('$baseUrl/api/sync/users'),
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode({'users': pendingUsers}),
             )
@@ -112,9 +223,27 @@ class AutoSyncService {
         }
       }
 
-      // 2. Subir movimientos pendientes etiquetados con su business_id real
+      // 2. Subir productos personalizados creados en Mi Bodega
+      if (pendingProducts.isNotEmpty) {
+        final prodResp = await http
+            .post(
+              Uri.parse('$baseUrl/api/sync/products'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'products': pendingProducts}),
+            )
+            .timeout(const Duration(seconds: 6));
+
+        if (prodResp.statusCode == 200) {
+          reached = true;
+          final data = jsonDecode(prodResp.body) as Map<String, dynamic>;
+          final ids = (data['synced_ids'] as List? ?? []).map((e) => e.toString()).toList();
+          await _ledger.markProductsSynced(ids);
+          syncedProducts = ids.length;
+        }
+      }
+
+      // 3. Subir movimientos pendientes etiquetados con su business_id real
       if (pendingMoves.isNotEmpty) {
-        final movesUri = Uri.parse('$baseUrl/api/sync/movements');
         final payload = {
           'movements': pendingMoves
               .map((m) => {
@@ -133,7 +262,7 @@ class AutoSyncService {
 
         final response = await http
             .post(
-              movesUri,
+              Uri.parse('$baseUrl/api/sync/movements'),
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(payload),
             )
@@ -152,6 +281,7 @@ class AutoSyncService {
       return SyncResult(
         reachedServer: reached,
         syncedUsersCount: syncedUsers,
+        syncedProductsCount: syncedProducts,
         syncedCount: syncedMoves,
         pendingRemaining: stillPending.length,
       );
@@ -159,11 +289,59 @@ class AutoSyncService {
       return SyncResult(
         reachedServer: false,
         syncedUsersCount: syncedUsers,
+        syncedProductsCount: syncedProducts,
         syncedCount: syncedMoves,
         pendingRemaining: pendingMoves.length,
       );
     } finally {
       _isSyncing = false;
     }
+  }
+
+  /// Consulta en vivo el resumen real de Compras Colectivas desde el servidor Rust.
+  Future<Map<String, dynamic>?> fetchCollectiveSummary() async {
+    final online = await checkOnlineNow();
+    if (!online) return null;
+    try {
+      final baseUrl = await _ledger.getServerUrl();
+      final resp = await http
+          .get(Uri.parse('$baseUrl/api/collective'))
+          .timeout(const Duration(seconds: 5));
+      if (resp.statusCode == 200) {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Suma un pedido real de la tienda actual a la compra colectiva del servidor Rust.
+  Future<Map<String, dynamic>?> joinCollectiveOrder({
+    required MerchantProfile user,
+    double quantity = 10.0,
+  }) async {
+    final online = await checkOnlineNow();
+    if (!online) return null;
+    try {
+      final baseUrl = await _ledger.getServerUrl();
+      final resp = await http
+          .post(
+            Uri.parse('$baseUrl/api/collective/join'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'business_id': user.id,
+              'business_name': user.businessName,
+              'zone': user.zone,
+              'product_id': 'prod_arroz_casanare',
+              'product_name': 'Arroz Casanareño',
+              'quantity': quantity,
+              'unit': 'bultos',
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+      if (resp.statusCode == 200) {
+        return jsonDecode(resp.body) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
   }
 }
