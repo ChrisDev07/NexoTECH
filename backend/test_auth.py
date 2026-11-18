@@ -73,6 +73,43 @@ class TestAuthSecurity(unittest.TestCase):
         self.assertEqual(res["user"]["id"], "tienda_demo")
         self.assertEqual(res["user"]["owner_name"], "Don Pedro")
 
+    def test_sync_offline_mobile_user_and_web_login(self):
+        from auth import _hash_pin_mobile_sha256
+        salt = "0123456789abcdef0123456789abcdef"
+        mobile_hash = _hash_pin_mobile_sha256("4321", salt)
+
+        first = self.auth.sync_offline_user(
+            user_id="tienda_offline_test",
+            phone="3158887766",
+            owner_name="Doña Rosa",
+            business_name="Granero El Morichal",
+            zone="Centro, Yopal",
+            pin_salt=salt,
+            pin_hash=mobile_hash,
+            habeas_data_accepted=True,
+            created_at=1760000000000
+        )
+        self.assertEqual(first["status"], "created")
+
+        # Re-envío idempotente no duplica ni falla
+        second = self.auth.sync_offline_user(
+            user_id="tienda_offline_test",
+            phone="3158887766",
+            owner_name="Doña Rosa",
+            business_name="Granero El Morichal",
+            zone="Centro, Yopal",
+            pin_salt=salt,
+            pin_hash=mobile_hash,
+            habeas_data_accepted=True
+        )
+        self.assertEqual(second["status"], "already_exists")
+
+        # La cuenta creada offline en el celular puede iniciar sesión luego en la web
+        login_res, err = self.auth.login("3158887766", "4321")
+        self.assertIsNone(err)
+        self.assertEqual(login_res["user"]["id"], "tienda_offline_test")
+        self.assertEqual(login_res["user"]["business_name"], "Granero El Morichal")
+
 
 if __name__ == "__main__":
     unittest.main()

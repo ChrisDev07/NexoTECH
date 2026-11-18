@@ -232,6 +232,26 @@ class OrigoHandler(BaseHTTPRequestHandler):
             daily_stock = LEDGER.compute_daily_stock(PARSER.catalog["products"], business_id=business_id)
             self._send_json({"status": "ok", "recorded": recorded, "daily_stock": daily_stock})
 
+        elif path == "/api/sync/users":
+            incoming_users = payload.get("users", [])
+            synced_ids = []
+            for u in incoming_users:
+                if not u.get("id") or not u.get("phone"):
+                    continue
+                res = AUTH.sync_offline_user(
+                    user_id=u["id"],
+                    phone=u["phone"],
+                    owner_name=u.get("owner_name", "Comerciante"),
+                    business_name=u.get("business_name", "Mi Tienda"),
+                    zone=u.get("zone", "Comuna 2, Yopal"),
+                    pin_salt=u.get("pin_salt", ""),
+                    pin_hash=u.get("pin_hash", ""),
+                    habeas_data_accepted=bool(u.get("habeas_data_accepted", True)),
+                    created_at=u.get("created_at")
+                )
+                synced_ids.append(u["id"])
+            self._send_json({"status": "ok", "synced_ids": synced_ids, "synced_count": len(synced_ids)})
+
         elif path == "/api/sync/movements":
             business_id = self._get_business_id()
             incoming = payload.get("movements", [])

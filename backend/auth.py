@@ -43,8 +43,20 @@ def hash_pin(pin: str, salt_hex: Optional[str] = None) -> Tuple[str, str]:
     return salt.hex(), dk.hex()
 
 
+def _hash_pin_mobile_sha256(pin: str, salt_hex: str) -> str:
+    """Compatibilidad con hash offline iterado generado por la app móvil Flutter."""
+    digest = hashlib.sha256(f"{salt_hex}:{pin}".encode("utf-8")).digest()
+    salt_bytes = salt_hex.encode("utf-8")
+    for _ in range(2000):
+        digest = hashlib.sha256(digest + salt_bytes).digest()
+    return f"sha256_iter2000:{digest.hex()}"
+
+
 def verify_pin(pin: str, salt_hex: str, expected_hash_hex: str) -> bool:
     """Verifica una clave/PIN en tiempo constante para evitar ataques de temporización."""
+    if expected_hash_hex.startswith("sha256_iter2000:"):
+        computed_hash = _hash_pin_mobile_sha256(pin, salt_hex)
+        return hmac.compare_digest(computed_hash, expected_hash_hex)
     _, computed_hash = hash_pin(pin, salt_hex)
     return hmac.compare_digest(computed_hash, expected_hash_hex)
 
@@ -239,6 +251,51 @@ class AuthManager:
             return
         with self.conn:
             self.conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+
+    def sync_offline_user(
+        self,
+        user_id: str,
+        phone: str,
+        owner_name: str,
+        business_name: str,
+        zone: str,
+        pin_salt: str,
+        pin_hash: str,
+        habeas_data_accepted: bool = True,
+        created_at: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """Registra de forma idempotente una tienda creada offline en el celular."""
+        clean_phone = sanitize_phone(phone)
+        ts = float(created_at or time.time())
+        if ts > 1e11:
+            ts = ts / 1000.0
+
+        cur = self.conn.cursor()
+        cur.execute("SELECT id FROM users WHERE id = ? OR phone = ?", (user_id, clean_phone))
+        existing = cur.fetchone()
+        if existing:
+            return {"id": existing[0], "status": "already_exists"}
+
+        with self.conn:
+            self.conn.execute("""
+                INSERT INTO users
+                (id, phone, owner_name, business_name, zone, role, pin_salt, pin_hash,
+                 habeas_data_accepted, habeas_data_timestamp, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                user_id,
+                clean_phone,
+                (owner_name or "").strip(),
+                (business_name or "").strip(),
+                (zone or "Comuna 2, Yopal").strip(),
+                "comerciante",
+                pin_salt,
+                pin_hash,
+                1 if habeas_data_accepted else 0,
+                ts,
+                ts
+            ))
+        return {"id": user_id, "status": "created"}
 
     @staticmethod
     def get_privacy_policy() -> Dict[str, Any]:
