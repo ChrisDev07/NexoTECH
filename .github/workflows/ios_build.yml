@@ -1,0 +1,49 @@
+name: Origo iOS Build & Verification
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  ios-build:
+    name: Build & Verify iOS (macOS Runner)
+    runs-on: macos-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Instalar dependencias Flutter
+        run: |
+          cd mobile
+          flutter pub get
+
+      - name: Ejecutar pruebas unitarias y de seguridad
+        run: |
+          cd mobile
+          flutter test
+
+      - name: Compilar para Simulador iOS (Runner.app)
+        run: |
+          cd mobile
+          flutter build ios --no-codesign --simulator
+
+      - name: Empaquetar para pruebas en Appetize.io / Simulador
+        run: |
+          cd mobile/build/ios/iphonesimulator
+          zip -r Origo-iOS-Simulator.zip Runner.app
+
+      - name: Publicar artefacto descargable de iOS
+        uses: actions/upload-artifact@v4
+        with:
+          name: origo-ios-simulator
+          path: mobile/build/ios/iphonesimulator/Origo-iOS-Simulator.zip
