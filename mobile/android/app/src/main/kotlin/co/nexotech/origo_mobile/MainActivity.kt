@@ -1,7 +1,11 @@
 package co.nexotech.origo_mobile
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -20,14 +24,19 @@ import java.util.zip.ZipInputStream
 
 class MainActivity : FlutterActivity(), RecognitionListener {
     companion object {
-        private const val CHANNEL = "co.nexotech.origo/offline_voice"
+        private const val VOICE_CHANNEL = "co.nexotech.origo/offline_voice"
+        private const val NETWORK_CHANNEL = "co.nexotech.origo/network"
         private const val PERMISSION_REQUEST_AUDIO = 1001
         private const val MODEL_ASSET_ZIP = "model-es.zip"
         private const val MODEL_MARKER_FILE = ".origo_vosk_es_ready"
     }
 
-    private var methodChannel: MethodChannel? = null
+    private var voiceChannel: MethodChannel? = null
+    private var networkChannel: MethodChannel? = null
     private val executor = Executors.newSingleThreadExecutor()
+
+    private var connectivityManager: ConnectivityManager? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     @Volatile
     private var model: Model? = null
@@ -40,8 +49,10 @@ class MainActivity : FlutterActivity(), RecognitionListener {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-        methodChannel?.setMethodCallHandler { call, result ->
+
+        // Canal 1: Voz 100% Offline (Vosk)
+        voiceChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, VOICE_CHANNEL)
+        voiceChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "initModel" -> {
                     ensureModelLoaded()
@@ -57,18 +68,68 @@ class MainActivity : FlutterActivity(), RecognitionListener {
                 else -> result.notImplemented()
             }
         }
-        // Precargar modelo en segundo plano al abrir la app
+
+        // Canal 2: Monitoreo real de conectividad Android (Wi-Fi / Datos / Modo Avión)
+        networkChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, NETWORK_CHANNEL)
+        networkChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isOnline" -> result.success(isCurrentlyOnline())
+                else -> result.notImplemented()
+            }
+        }
+        registerNetworkMonitor()
+
+        // Precargar modelo acústico en segundo plano al abrir la app
         ensureModelLoaded()
+    }
+
+    private fun isCurrentlyOnline(): Boolean {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return false
+        val active = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(active) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+    }
+
+    private fun registerNetworkMonitor() {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager ?: return
+        connectivityManager = cm
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                sendNetworkEvent(true)
+            }
+
+            override fun onLost(network: Network) {
+                sendNetworkEvent(isCurrentlyOnline())
+            }
+
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                val online = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                sendNetworkEvent(online)
+            }
+        }
+        networkCallback = callback
+        try {
+            cm.registerDefaultNetworkCallback(callback)
+        } catch (_: Exception) {}
+    }
+
+    private fun sendNetworkEvent(isOnline: Boolean) {
+        runOnUiThread {
+            networkChannel?.invokeMethod("onConnectivityChanged", isOnline)
+        }
     }
 
     private fun ensureModelLoaded() {
         if (model != null) {
-            sendEvent("onModelStatus", "ready")
+            sendVoiceEvent("onModelStatus", "ready")
             return
         }
         if (isModelLoading) return
         isModelLoading = true
-        sendEvent("onModelStatus", "loading")
+        sendVoiceEvent("onModelStatus", "loading")
 
         executor.execute {
             try {
@@ -80,14 +141,13 @@ class MainActivity : FlutterActivity(), RecognitionListener {
                     unzipAssetToDir(MODEL_ASSET_ZIP, targetBaseDir)
                     marker.createNewFile()
                 }
-                // Localizar carpeta raíz real del modelo (contiene am/ y conf/)
                 val modelRoot = findModelRoot(targetBaseDir) ?: targetBaseDir
                 model = Model(modelRoot.absolutePath)
                 isModelLoading = false
-                sendEvent("onModelStatus", "ready")
+                sendVoiceEvent("onModelStatus", "ready")
             } catch (e: Exception) {
                 isModelLoading = false
-                sendEvent("onModelStatus", "error:${e.message ?: "Error cargando modelo offline"}")
+                sendVoiceEvent("onModelStatus", "error:${e.message ?: "Error cargando modelo offline"}")
             }
         }
     }
@@ -164,16 +224,13 @@ class MainActivity : FlutterActivity(), RecognitionListener {
             speechService?.startListening(this)
             result.success("listening")
         } catch (e: Exception) {
-            sendEvent("onError", "Error iniciando micrófono: ${e.message}")
+            sendVoiceEvent("onError", "Error iniciando micrófono: ${e.message}")
             result.success("error")
         }
     }
 
     private fun stopOfflineListening() {
-        val service = speechService
-        if (service != null) {
-            service.stop()
-        }
+        speechService?.stop()
     }
 
     private fun stopSpeechServiceOnly() {
@@ -200,14 +257,14 @@ class MainActivity : FlutterActivity(), RecognitionListener {
                         val recognizer = Recognizer(loadedModel, 16000.0f)
                         speechService = SpeechService(recognizer, 16000.0f)
                         speechService?.startListening(this)
-                        sendEvent("onListeningStarted", true)
+                        sendVoiceEvent("onListeningStarted", true)
                     } catch (e: Exception) {
-                        sendEvent("onError", "No se pudo abrir el micrófono: ${e.message}")
+                        sendVoiceEvent("onError", "No se pudo abrir el micrófono: ${e.message}")
                     }
                 }
             } else {
                 pendingStartAfterPermission = false
-                sendEvent("onError", "Permiso de micrófono denegado.")
+                sendVoiceEvent("onError", "Permiso de micrófono denegado.")
             }
         }
     }
@@ -218,7 +275,7 @@ class MainActivity : FlutterActivity(), RecognitionListener {
             val partial = JSONObject(hypothesis).optString("partial", "").trim()
             val combined = buildCombined(partial)
             if (combined.isNotEmpty()) {
-                sendEvent("onPartial", combined)
+                sendVoiceEvent("onPartial", combined)
             }
         } catch (_: Exception) {}
     }
@@ -230,7 +287,7 @@ class MainActivity : FlutterActivity(), RecognitionListener {
             if (text.isNotEmpty()) {
                 if (accumulatedText.isNotEmpty()) accumulatedText.append(' ')
                 accumulatedText.append(text)
-                sendEvent("onPartial", accumulatedText.toString())
+                sendVoiceEvent("onPartial", accumulatedText.toString())
             }
         } catch (_: Exception) {}
     }
@@ -250,13 +307,13 @@ class MainActivity : FlutterActivity(), RecognitionListener {
         accumulatedText.clear()
         speechService?.shutdown()
         speechService = null
-        sendEvent("onFinal", finalPhrase)
+        sendVoiceEvent("onFinal", finalPhrase)
     }
 
     override fun onError(exception: Exception?) {
         speechService?.shutdown()
         speechService = null
-        sendEvent("onError", exception?.message ?: "Error en reconocimiento de voz")
+        sendVoiceEvent("onError", exception?.message ?: "Error en reconocimiento de voz")
     }
 
     override fun onTimeout() {
@@ -270,13 +327,16 @@ class MainActivity : FlutterActivity(), RecognitionListener {
         return "$base $partial"
     }
 
-    private fun sendEvent(method: String, argument: Any?) {
+    private fun sendVoiceEvent(method: String, argument: Any?) {
         runOnUiThread {
-            methodChannel?.invokeMethod(method, argument)
+            voiceChannel?.invokeMethod(method, argument)
         }
     }
 
     override fun onDestroy() {
+        networkCallback?.let { cb ->
+            try { connectivityManager?.unregisterNetworkCallback(cb) } catch (_: Exception) {}
+        }
         stopSpeechServiceOnly()
         model?.close()
         model = null

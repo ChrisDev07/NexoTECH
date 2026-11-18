@@ -3,16 +3,14 @@ import 'package:flutter/material.dart';
 class OrigoHeader extends StatelessWidget {
   final String ownerName;
   final String storeLocation;
-  final bool isOfflineMode;
-  final VoidCallback onToggleOffline;
+  final VoidCallback? onConfigureServer;
   final VoidCallback? onLogout;
 
   const OrigoHeader({
     super.key,
     required this.ownerName,
     required this.storeLocation,
-    required this.isOfflineMode,
-    required this.onToggleOffline,
+    this.onConfigureServer,
     this.onLogout,
   });
 
@@ -37,7 +35,7 @@ class OrigoHeader extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
+                  color: Colors.white.withValues(alpha: 0.18),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: const Text(
@@ -51,34 +49,18 @@ class OrigoHeader extends StatelessWidget {
               ),
               Row(
                 children: [
-                  InkWell(
-                    onTap: onToggleOffline,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: isOfflineMode
-                            ? const Color(0xFFF59E0B)
-                            : Colors.white.withOpacity(0.22),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        isOfflineMode ? '✈️ Sin Internet' : '🟢 Conectado',
-                        style: TextStyle(
-                          color: isOfflineMode ? const Color(0xFF1C1917) : Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                        ),
-                      ),
+                  if (onConfigureServer != null)
+                    IconButton(
+                      onPressed: onConfigureServer,
+                      icon: const Icon(Icons.dns_rounded, color: Colors.white, size: 21),
+                      tooltip: 'Servidor de sincronización',
                     ),
-                  ),
-                  if (onLogout != null) ...[
-                    const SizedBox(width: 6),
+                  if (onLogout != null)
                     IconButton(
                       onPressed: onLogout,
-                      icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 20),
+                      icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 21),
                       tooltip: 'Cerrar sesión',
                     ),
-                  ],
                 ],
               ),
             ],
@@ -95,7 +77,7 @@ class OrigoHeader extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             '📍 $storeLocation',
-            style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 14),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14),
           ),
         ],
       ),

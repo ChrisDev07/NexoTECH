@@ -9,6 +9,7 @@ import 'screens/login_screen.dart';
 import 'services/nlp_service.dart';
 import 'services/offline_ledger.dart';
 import 'services/offline_voice_service.dart';
+import 'services/sync_service.dart';
 import 'widgets/confirmation_sheet.dart';
 import 'widgets/origo_header.dart';
 
@@ -51,10 +52,10 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   final RegionalNlpService _nlp = RegionalNlpService();
   final OfflineLedgerService _ledger = OfflineLedgerService();
   final OfflineVoiceService _voice = OfflineVoiceService();
+  late final AutoSyncService _sync = AutoSyncService(_ledger);
 
   MerchantProfile? _currentUser;
   int _selectedTab = 0;
-  bool _isOfflineMode = true;
   bool _isListening = false;
   bool _isVoiceModelReady = false;
   bool _isHistoryExpanded = true;
@@ -156,15 +157,34 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
     await _nlp.loadCatalog();
     await _loadLedgerFromSqlite();
 
+    // 1. Escuchar cambios reales de conectividad del celular (Wi-Fi / Datos / Modo Avión)
+    _sync.onConnectivityChanged = (bool isOnline) async {
+      if (!mounted) return;
+      if (!isOnline) {
+        _showSnack('✈️ Sin señal: los movimientos se guardarán localmente en tu celular.');
+        return;
+      }
+      // Esperar brevemente a que Android complete el enrutamiento al desactivar Modo Avión
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return;
+      await _attemptAutoSync(notifyOnSuccess: true);
+    };
+
+    try {
+      final onlineNow = await _sync.init();
+      if (onlineNow) {
+        await _attemptAutoSync(notifyOnSuccess: false);
+      }
+    } catch (_) {}
+
+    // 2. Inicializar motor de voz 100% offline (Vosk embebido)
     _voice.onModelStatus = (status) {
       if (!mounted) return;
       if (status == 'ready') {
         setState(() => _isVoiceModelReady = true);
       } else if (status.startsWith('error:')) {
         setState(() => _isVoiceModelReady = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('⚠️ ${status.substring(6)}')),
-        );
+        _showSnack('⚠️ ${status.substring(6)}');
       }
     };
 
@@ -190,18 +210,14 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
       if (finalText.trim().isNotEmpty) {
         _handleSpokenPhrase(finalText);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('⚠️ No se escuchó voz. Habla cerca del micrófono e intenta de nuevo.')),
-        );
+        _showSnack('⚠️ No se escuchó voz. Habla cerca del micrófono e intenta de nuevo.');
       }
     };
 
     _voice.onError = (err) {
       if (!mounted) return;
       setState(() => _isListening = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ $err')),
-      );
+      _showSnack('⚠️ $err');
     };
 
     try {
@@ -209,8 +225,25 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
       if (mounted && ready) {
         setState(() => _isVoiceModelReady = true);
       }
-    } catch (_) {
-      // En tests unitarios sin plataforma Android el MethodChannel no está registrado
+    } catch (_) {}
+  }
+
+  void _showSnack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _attemptAutoSync({required bool notifyOnSuccess}) async {
+    final result = await _sync.syncPendingMovements();
+    if (result.syncedCount > 0) {
+      await _loadLedgerFromSqlite();
+      if (notifyOnSuccess) {
+        _showSnack(
+          '☁️ ¡Internet detectado! ${result.syncedCount} movimiento${result.syncedCount == 1 ? "" : "s"} subido${result.syncedCount == 1 ? "" : "s"} al servidor.',
+        );
+      }
     }
   }
 
@@ -277,18 +310,14 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
         _isListening = true;
       });
     } else if (status == 'loading_model') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⏳ Terminando de cargar el modelo de voz sin internet... intenta en 2 segundos.')),
-      );
+      _showSnack('⏳ Terminando de cargar el modelo de voz sin internet... intenta en 2 segundos.');
     }
   }
 
   void _handleSpokenPhrase(String phrase) {
     final parsed = _nlp.parsePhrase(phrase);
     if (parsed.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ Escuché "$phrase", pero no reconocí un producto del catálogo.')),
-      );
+      _showSnack('⚠️ Escuché "$phrase", pero no reconocí un producto del catálogo.');
       return;
     }
     final first = parsed.first;
@@ -309,27 +338,83 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
       initialIsSale: isSale,
       initialQty: qty,
       onConfirm: (confirmedSale, confirmedQty) async {
+        // 1. Siempre guardar primero en SQLite local (synced = 0) -> Cero pérdida de datos
         await _ledger.recordMovement(
           productId: product.id,
           productName: product.name,
           isSale: confirmedSale,
           quantity: confirmedQty,
           unit: product.unit,
-          synced: !_isOfflineMode,
+          synced: false,
         );
         await _loadLedgerFromSqlite();
-        if (!mounted) return;
-        setState(() => _liveTranscript = '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _isOfflineMode
-                  ? '💾 Guardado sin internet en SQLite (pendiente de sincronizar)'
-                  : '✅ ¡Guardado en el inventario del día!',
-            ),
-          ),
-        );
+        if (mounted) setState(() => _liveTranscript = '');
+
+        // 2. Revisar conectividad REAL del celular y sincronizar automáticamente si hay señal
+        final online = await _sync.checkOnlineNow();
+        if (!online) {
+          _showSnack('💾 Sin señal: guardado localmente. Se subirá al servidor al tener internet.');
+          return;
+        }
+
+        final syncRes = await _sync.syncPendingMovements();
+        await _loadLedgerFromSqlite();
+        if (syncRes.reachedServer) {
+          _showSnack('✅ ¡Guardado y subido automáticamente al servidor!');
+        } else {
+          _showSnack('💾 Guardado en local (pendiente de conectar con el servidor).');
+        }
       },
+    );
+  }
+
+  Future<void> _openServerConfigDialog() async {
+    final currentUrl = await _ledger.getServerUrl();
+    final ctrl = TextEditingController(text: currentUrl);
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('🌐 Servidor de Sincronización'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Dirección del servidor donde se subirán los datos al tener Wi-Fi o datos móviles:',
+              style: TextStyle(fontSize: 13),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'URL del servidor',
+                hintText: 'http://192.168.1.50:8000',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              final url = ctrl.text.trim();
+              if (url.isNotEmpty) {
+                await _ledger.setServerUrl(url);
+                if (ctx.mounted) Navigator.pop(ctx);
+                _showSnack('✔ Servidor guardado. Intentando sincronizar...');
+                await _attemptAutoSync(notifyOnSuccess: true);
+              }
+            },
+            child: const Text('Guardar y sincronizar'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -337,7 +422,10 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   Widget build(BuildContext context) {
     if (_currentUser == null) {
       return LoginScreen(
-        onAuthenticated: (profile) => setState(() => _currentUser = profile),
+        onAuthenticated: (profile) {
+          setState(() => _currentUser = profile);
+          _attemptAutoSync(notifyOnSuccess: true);
+        },
       );
     }
 
@@ -349,18 +437,8 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
           OrigoHeader(
             ownerName: _currentUser!.ownerName,
             storeLocation: '${_currentUser!.businessName} · ${_currentUser!.zone}',
-            isOfflineMode: _isOfflineMode,
+            onConfigureServer: _openServerConfigDialog,
             onLogout: () => setState(() => _currentUser = null),
-            onToggleOffline: () async {
-              final nextOffline = !_isOfflineMode;
-              if (!nextOffline) {
-                await _ledger.markAllSynced();
-                await _loadLedgerFromSqlite();
-              }
-              if (mounted) {
-                setState(() => _isOfflineMode = nextOffline);
-              }
-            },
           ),
           Expanded(
             child: IndexedStack(
@@ -385,9 +463,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
                   extraBultos: _extraCollectiveBultos,
                   onJoinOrder: () {
                     setState(() => _extraCollectiveBultos += 10);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('🎉 ¡Sumaste +10 bultos al pedido comunitario!')),
-                    );
+                    _showSnack('🎉 ¡Sumaste +10 bultos al pedido comunitario!');
                   },
                 ),
               ],
