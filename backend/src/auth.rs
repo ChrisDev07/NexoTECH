@@ -335,6 +335,12 @@ impl AuthManager {
         let (user, salt, hash) = match row {
             Some(v) => v,
             None => {
+                // OWASP A07: Mitigación de timing attack para prevenir enumeración de cuentas.
+                let _ = verify_pin(
+                    clean_pin,
+                    "00112233445566778899aabbccddeeff",
+                    "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff",
+                );
                 return Err("Celular o clave incorrectos. Verifica e intenta de nuevo.".into());
             }
         };

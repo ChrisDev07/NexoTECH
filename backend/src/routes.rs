@@ -1,12 +1,15 @@
 //! Rutas HTTP REST y servidor de archivos estáticos de Origo en Rust (Axum).
 //! Mantiene 100% compatibilidad con la app móvil Flutter y la interfaz web existente.
 
-use crate::auth::{privacy_policy_ley_1581, AuthManager};
+use crate::auth::{privacy_policy_ley_1581, sanitize_phone, AuthManager};
 use crate::collective::CollectivePurchasingEngine;
 use crate::ledger::LocalLedger;
 use crate::models::{now_unix_secs, CatalogProduct, Movement, PublicUser};
 use crate::nlp::RegionalNlpParser;
-use axum::extract::State;
+use crate::security::{
+    self, log_security_event, mask_phone, validate_movement_quantity, RateLimiter,
+};
+use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -23,6 +26,8 @@ pub struct AppState {
     pub ledger: LocalLedger,
     pub auth: AuthManager,
     pub collective: CollectivePurchasingEngine,
+    pub auth_limiter: RateLimiter,
+    pub nlp_limiter: RateLimiter,
 }
 
 impl AppState {
@@ -32,16 +37,34 @@ impl AppState {
         let auth = AuthManager::open(db_path)?;
         ledger.seed_demo_data(false)?;
         let collective = CollectivePurchasingEngine::new(120_000.0);
+        let auth_limiter = RateLimiter::new(10, 60); // 10 intentos por minuto por cuenta
+        let nlp_limiter = RateLimiter::new(60, 60);   // 60 peticiones por minuto
         Ok(Arc::new(Self {
             parser,
             ledger,
             auth,
             collective,
+            auth_limiter,
+            nlp_limiter,
         }))
     }
 }
 
 pub fn build_router(state: Arc<AppState>, static_dir: Option<PathBuf>) -> Router {
+    let cors = CorsLayer::new()
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::OPTIONS,
+        ])
+        .allow_headers([
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::CONTENT_TYPE,
+            axum::http::header::ACCEPT,
+            axum::http::header::ORIGIN,
+        ])
+        .allow_origin(tower_http::cors::Any);
+
     let mut router = Router::new()
         .route("/api/health", get(health_check))
         .route("/api/privacy", get(get_privacy))
@@ -64,7 +87,9 @@ pub fn build_router(state: Arc<AppState>, static_dir: Option<PathBuf>) -> Router
         .route("/api/collective/simulate", post(collective_simulate))
         .route("/api/reset", post(reset_demo))
         .with_state(state)
-        .layer(CorsLayer::permissive());
+        .layer(axum::middleware::from_fn(security::security_headers_middleware))
+        .layer(DefaultBodyLimit::max(2 * 1024 * 1024))
+        .layer(cors);
 
     if let Some(dir) = static_dir {
         if dir.is_dir() {
@@ -163,6 +188,23 @@ async fn auth_register(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<RegisterPayload>,
 ) -> Response {
+    let clean_phone = sanitize_phone(&payload.phone);
+    if let Err(wait) = state.auth_limiter.check_and_inc(&clean_phone) {
+        log_security_event(
+            "AUTH_REGISTER_RATE_LIMIT",
+            &mask_phone(&clean_phone),
+            "Exceso de intentos de registro",
+            false,
+        );
+        return json_no_cache(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({
+                "error": format!("Demasiadas solicitudes de registro. Por seguridad, espera {} segundos.", wait),
+                "retry_after": wait
+            }),
+        );
+    }
+
     let accepted = value_as_bool(Some(&payload.habeas_data_accepted), false);
     match state.auth.register_user(
         &payload.phone,
@@ -174,8 +216,24 @@ async fn auth_register(
         &payload.zone,
         accepted,
     ) {
-        Ok(res) => json_no_cache(StatusCode::CREATED, json!(res)),
-        Err(err) => json_no_cache(StatusCode::BAD_REQUEST, json!({ "error": err })),
+        Ok(res) => {
+            log_security_event(
+                "AUTH_REGISTER_SUCCESS",
+                &mask_phone(&clean_phone),
+                "Usuario registrado exitosamente",
+                true,
+            );
+            json_no_cache(StatusCode::CREATED, json!(res))
+        }
+        Err(err) => {
+            log_security_event(
+                "AUTH_REGISTER_FAILED",
+                &mask_phone(&clean_phone),
+                &err,
+                false,
+            );
+            json_no_cache(StatusCode::BAD_REQUEST, json!({ "error": err }))
+        }
     }
 }
 
@@ -191,9 +249,43 @@ async fn auth_login(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<LoginPayload>,
 ) -> Response {
+    let clean_phone = sanitize_phone(&payload.phone);
+    if let Err(wait) = state.auth_limiter.check_and_inc(&clean_phone) {
+        log_security_event(
+            "AUTH_LOGIN_RATE_LIMIT",
+            &mask_phone(&clean_phone),
+            "Exceso de intentos de login",
+            false,
+        );
+        return json_no_cache(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({
+                "error": format!("Demasiados intentos fallidos. Por seguridad, espera {} segundos.", wait),
+                "retry_after": wait
+            }),
+        );
+    }
+
     match state.auth.login(&payload.phone, &payload.pin) {
-        Ok(res) => json_no_cache(StatusCode::OK, json!(res)),
-        Err(err) => json_no_cache(StatusCode::UNAUTHORIZED, json!({ "error": err })),
+        Ok(res) => {
+            state.auth_limiter.reset(&clean_phone);
+            log_security_event(
+                "AUTH_LOGIN_SUCCESS",
+                &mask_phone(&clean_phone),
+                "Sesión iniciada exitosamente",
+                true,
+            );
+            json_no_cache(StatusCode::OK, json!(res))
+        }
+        Err(err) => {
+            log_security_event(
+                "AUTH_LOGIN_FAILED",
+                &mask_phone(&clean_phone),
+                "Credenciales incorrectas",
+                false,
+            );
+            json_no_cache(StatusCode::UNAUTHORIZED, json!({ "error": err }))
+        }
     }
 }
 
@@ -423,6 +515,21 @@ async fn nlp_parse(
     Json(payload): Json<NlpPayload>,
 ) -> Response {
     let business_id = resolve_business_id(&state, &headers);
+    if let Err(wait) = state.nlp_limiter.check_and_inc(&business_id) {
+        return json_no_cache(
+            StatusCode::TOO_MANY_REQUESTS,
+            json!({
+                "error": format!("Límite de procesamiento NLP alcanzado. Espera {} segundos.", wait),
+                "retry_after": wait
+            }),
+        );
+    }
+    if payload.phrase.len() > 1000 {
+        return json_no_cache(
+            StatusCode::BAD_REQUEST,
+            json!({ "error": "La frase excede la longitud máxima permitida (1000 caracteres)." }),
+        );
+    }
     let custom = state
         .ledger
         .get_custom_products(&business_id)
@@ -519,6 +626,13 @@ async fn post_movements(
         .into_iter()
         .map(|s| (s.product_id, s.current_stock))
         .collect();
+
+    // OWASP A03 / Mobile M4: Validación estricta de cantidades
+    for it in &payload.items {
+        if let Err(err) = validate_movement_quantity(it.quantity) {
+            return json_no_cache(StatusCode::BAD_REQUEST, json!({ "error": err }));
+        }
+    }
 
     for it in &payload.items {
         let current_qty = available_map.get(&it.product_id).copied().unwrap_or(0.0);
@@ -686,6 +800,10 @@ async fn sync_movements(
         let Some(quantity) = m.get("quantity").and_then(Value::as_f64) else {
             continue;
         };
+        // OWASP A03 / Mobile M4: Descartar cantidades anómalas
+        if validate_movement_quantity(quantity).is_err() {
+            continue;
+        }
 
         let raw_ts = m
             .get("timestamp")
@@ -697,12 +815,29 @@ async fn sync_movements(
             raw_ts
         };
 
+        let caller = current_user(&state, &headers);
         let bid = m
             .get("business_id")
             .and_then(Value::as_str)
             .filter(|s| !s.is_empty())
             .unwrap_or(&fallback_business_id)
             .to_string();
+
+        // OWASP A01: Control de acceso estricto y prevención de IDOR
+        if let Some(ref user) = caller {
+            if bid != user.id {
+                log_security_event(
+                    "IDOR_PREVENTED",
+                    &user.id,
+                    &format!("Intento de sincronizar en tienda ajena {}", bid),
+                    false,
+                );
+                return json_no_cache(
+                    StatusCode::FORBIDDEN,
+                    json!({ "error": "Acceso denegado: no tienes permisos para sincronizar movimientos en otra tienda." }),
+                );
+            }
+        }
         last_business_id = bid.clone();
 
         let mov = Movement {
@@ -1228,5 +1363,94 @@ mod tests {
         )
         .await;
         assert_eq!(st, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_owasp_security_headers_and_controls() {
+        let state = AppState::open(":memory:").unwrap();
+        let app = build_router(state, None);
+
+        let req = Request::builder()
+            .method("GET")
+            .uri("/api/health")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+
+        assert_eq!(resp.status(), StatusCode::OK);
+        let headers = resp.headers();
+        assert_eq!(headers.get("x-frame-options").unwrap(), "DENY");
+        assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
+        assert!(headers.get("strict-transport-security").is_some());
+        assert!(headers.get("content-security-policy").is_some());
+        assert_eq!(headers.get("x-permitted-cross-domain-policies").unwrap(), "none");
+    }
+
+    #[tokio::test]
+    async fn test_owasp_anti_idor_and_quantity_validation() {
+        let state = AppState::open(":memory:").unwrap();
+        let app = build_router(state, None);
+
+        // 1. Registrar usuario legítimo
+        let (st, reg) = call_json(
+            &app,
+            "POST",
+            "/api/auth/register",
+            None,
+            Some(json!({
+                "phone": "3159998877",
+                "pin": "1234",
+                "owner_name": "Usuario Legítimo",
+                "business_name": "Mi Tienda Real",
+                "zone": "Yopal",
+                "habeas_data_accepted": true
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::CREATED);
+        let tok = reg["token"].as_str().unwrap();
+
+        // 2. Intentar registrar movimiento con cantidad negativa -> 400 Bad Request
+        let (st, err_qty) = call_json(
+            &app,
+            "POST",
+            "/api/movements",
+            Some(tok),
+            Some(json!({
+                "items": [{
+                    "product_id": "prod_arroz_casanare",
+                    "product_name": "Arroz Casanareño",
+                    "action": "ENTRADA",
+                    "quantity": -10.0,
+                    "unit": "bultos"
+                }]
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::BAD_REQUEST);
+        assert!(err_qty["error"].as_str().unwrap().contains("mayor a cero"));
+
+        // 3. Intentar IDOR: Usuario legítimo intenta sincronizar movimientos con business_id de otra tienda -> 403 Forbidden
+        let (st, err_idor) = call_json(
+            &app,
+            "POST",
+            "/api/sync/movements",
+            Some(tok),
+            Some(json!({
+                "movements": [{
+                    "id": "mov_ataque_idor",
+                    "business_id": "tienda_demo",
+                    "product_id": "prod_arroz_casanare",
+                    "product_name": "Arroz",
+                    "type": "IN",
+                    "quantity": 100.0,
+                    "unit": "bultos",
+                    "timestamp": 1760000000.0
+                }]
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::FORBIDDEN);
+        assert!(err_idor["error"].as_str().unwrap().contains("permisos"));
     }
 }

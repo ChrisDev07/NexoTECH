@@ -6,3 +6,4 @@ pub mod ledger;
 pub mod models;
 pub mod nlp;
 pub mod routes;
+pub mod security;
