@@ -232,6 +232,31 @@ class OrigoHandler(BaseHTTPRequestHandler):
             daily_stock = LEDGER.compute_daily_stock(PARSER.catalog["products"], business_id=business_id)
             self._send_json({"status": "ok", "recorded": recorded, "daily_stock": daily_stock})
 
+        elif path == "/api/sync/movements":
+            business_id = self._get_business_id()
+            incoming = payload.get("movements", [])
+            synced_ids = []
+            for m in incoming:
+                raw_ts = float(m.get("timestamp", time.time()))
+                # Normalizar milisegundos (Dart/Android) a segundos Unix
+                ts_sec = raw_ts / 1000.0 if raw_ts > 1e11 else raw_ts
+                mov = Movement.from_dict({
+                    "id": m["id"],
+                    "business_id": m.get("business_id") or business_id,
+                    "product_id": m["product_id"],
+                    "product_name": m.get("product_name", ""),
+                    "type": m["type"],
+                    "quantity": m["quantity"],
+                    "unit": m.get("unit", "unidades"),
+                    "timestamp": ts_sec,
+                    "device_id": m.get("device_id", "android_mobile"),
+                    "synced": True
+                })
+                LEDGER.record_movement(mov)
+                synced_ids.append(mov.id)
+            daily_stock = LEDGER.compute_daily_stock(PARSER.catalog["products"], business_id=business_id)
+            self._send_json({"status": "ok", "synced_ids": synced_ids, "synced_count": len(synced_ids), "daily_stock": daily_stock})
+
         elif path == "/api/sync":
             business_id = self._get_business_id()
             pending = [m for m in LEDGER.get_pending_sync_movements() if m.business_id == business_id]
