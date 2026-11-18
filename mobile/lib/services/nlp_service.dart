@@ -99,8 +99,12 @@ class RegionalNlpService {
     if (a == b) return 1.0;
     if (a.isEmpty || b.isEmpty) return 0.0;
     final dp = List.generate(a.length + 1, (_) => List<int>.filled(b.length + 1, 0));
-    for (int i = 0; i <= a.length; i++) dp[i][0] = i;
-    for (int j = 0; j <= b.length; j++) dp[0][j] = j;
+    for (int i = 0; i <= a.length; i++) {
+      dp[i][0] = i;
+    }
+    for (int j = 0; j <= b.length; j++) {
+      dp[0][j] = j;
+    }
     for (int i = 1; i <= a.length; i++) {
       for (int j = 1; j <= b.length; j++) {
         final cost = a[i - 1] == b[j - 1] ? 0 : 1;
@@ -159,7 +163,7 @@ class RegionalNlpService {
     return found ? total : null;
   }
 
-  String _detectAction(String textNorm) {
+  String? _detectActionInClause(String textNorm) {
     final words = textNorm.split(' ');
     for (final w in words) {
       if (_outKeywords.contains(w)) return 'SALIDA';
@@ -171,7 +175,11 @@ class RegionalNlpService {
     for (final kw in _inKeywords) {
       if (RegExp('\\b${RegExp.escape(kw)}\\b').hasMatch(textNorm)) return 'ENTRADA';
     }
-    return 'ENTRADA';
+    return null;
+  }
+
+  String _detectAction(String textNorm) {
+    return _detectActionInClause(textNorm) ?? 'ENTRADA';
   }
 
   Map<String, dynamic>? _findBestProduct(String query) {
@@ -218,7 +226,8 @@ class RegionalNlpService {
       (m) => m.group(2)!,
     );
 
-    final action = _detectAction(textNorm);
+    final defaultAction = _detectAction(textNorm);
+    String currentAction = defaultAction;
     final protectedText = textNorm.replaceAllMapped(
       RegExp(r'\b([a-z]+)\s+y\s+medi([ao])\b'),
       (m) => '${m.group(1)}_y_medi${m.group(2)}',
@@ -239,6 +248,11 @@ class RegionalNlpService {
     for (final rawClause in clauses) {
       final clause = rawClause.replaceAll('_y_', ' y ').trim();
       if (clause.isEmpty) continue;
+
+      final clauseAction = _detectActionInClause(clause);
+      if (clauseAction != null) {
+        currentAction = clauseAction;
+      }
 
       double? quantity;
       String? numStr;
@@ -291,7 +305,7 @@ class RegionalNlpService {
       if (matched != null) {
         results.add(
           ParsedMovement(
-            action: action,
+            action: currentAction,
             quantity: quantity ?? 1.0,
             unit: unit ?? lastUnit ?? matched['default_unit'].toString(),
             productId: matched['product_id'].toString(),

@@ -297,30 +297,34 @@ impl RegionalNlpParser {
         best
     }
 
-    pub fn detect_action(&self, text_norm: &str) -> &'static str {
+    pub fn detect_action_in_clause(&self, text_norm: &str) -> Option<&'static str> {
         for w in text_norm.split_whitespace() {
             if self.in_keywords.iter().any(|k| k == w) {
-                return "ENTRADA";
+                return Some("ENTRADA");
             }
             if self.out_keywords.iter().any(|k| k == w) {
-                return "SALIDA";
+                return Some("SALIDA");
             }
         }
         for kw in &self.in_keywords {
             if let Ok(re) = Regex::new(&format!(r"\b{}\b", regex::escape(kw))) {
                 if re.is_match(text_norm) {
-                    return "ENTRADA";
+                    return Some("ENTRADA");
                 }
             }
         }
         for kw in &self.out_keywords {
             if let Ok(re) = Regex::new(&format!(r"\b{}\b", regex::escape(kw))) {
                 if re.is_match(text_norm) {
-                    return "SALIDA";
+                    return Some("SALIDA");
                 }
             }
         }
-        "ENTRADA"
+        None
+    }
+
+    pub fn detect_action(&self, text_norm: &str) -> &'static str {
+        self.detect_action_in_clause(text_norm).unwrap_or("ENTRADA")
     }
 
     pub fn parse_phrase(&self, raw_phrase: &str) -> Vec<ParsedEntity> {
@@ -337,7 +341,8 @@ impl RegionalNlpParser {
             .article_action_re
             .replace_all(&text_norm, "$2")
             .to_string();
-        let action = self.detect_action(&text_norm);
+        let default_action = self.detect_action(&text_norm);
+        let mut current_action = default_action;
 
         let protected_text = self
             .half_protect_re
@@ -351,6 +356,10 @@ impl RegionalNlpParser {
             let clause = raw_clause.replace("_y_", " y ").trim().to_string();
             if clause.is_empty() {
                 continue;
+            }
+
+            if let Some(act) = self.detect_action_in_clause(&clause) {
+                current_action = act;
             }
 
             let mut quantity: Option<f64> = None;
@@ -422,7 +431,7 @@ impl RegionalNlpParser {
             {
                 results.push(ParsedEntity {
                     raw_clause: clause,
-                    action: action.to_string(),
+                    action: current_action.to_string(),
                     quantity: quantity.unwrap_or(1.0),
                     unit: final_unit,
                     product_id: prod.id.clone(),
@@ -494,6 +503,21 @@ mod tests {
         assert_eq!(res[0].quantity, 15.0);
         assert_eq!(res[1].product_id, "prod_sal_marina");
         assert_eq!(res[1].quantity, 5.0);
+        assert_eq!(res[1].unit, "bultos");
+    }
+
+    #[test]
+    fn test_compound_mixed_actions() {
+        let res = parser().parse_phrase("Vendí 5 bultos de papa y compré 10 bultos de arroz");
+        assert_eq!(res.len(), 2);
+        assert_eq!(res[0].action, "SALIDA");
+        assert_eq!(res[0].product_id, "prod_papa_pastusa");
+        assert_eq!(res[0].quantity, 5.0);
+        assert_eq!(res[0].unit, "bultos");
+
+        assert_eq!(res[1].action, "ENTRADA");
+        assert_eq!(res[1].product_id, "prod_arroz_casanare");
+        assert_eq!(res[1].quantity, 10.0);
         assert_eq!(res[1].unit, "bultos");
     }
 
