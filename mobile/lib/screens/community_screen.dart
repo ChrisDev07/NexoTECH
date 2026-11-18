@@ -54,6 +54,7 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   final Map<String, double> _cardStepQuantities = {};
+  final Set<String> _receivedProductIds = {};
   int _expandedIndex = 0; // Primera tarjeta desplegada por defecto
 
   @override
@@ -874,57 +875,159 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       ),
                       if (myContribution != null) ...[
                         const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFECFDF5),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFA7F3D0), width: 1.5),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
-                                children: [
-                                  const Icon(Icons.check_circle_rounded, color: Color(0xFF047857), size: 20),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      '¡Aporte activo: ${(myContribution['quantity'] as num).toInt()} $unit pedidos!',
-                                      style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF065F46), fontSize: 13),
+                        Builder(
+                          builder: (ctx) {
+                            final isGoalReached = currentQty >= targetQty;
+                            final isAlreadyReceived = _receivedProductIds.contains(pid);
+                            final myQty = (myContribution['quantity'] as num).toInt();
+                            final remainingQty = (targetQty - currentQty).clamp(0.0, targetQty).toInt();
+
+                            if (isAlreadyReceived) {
+                              return Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF5F5F4),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFD6D3D1)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.check_circle_rounded, color: Color(0xFF047857), size: 20),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            '✔ ¡Pedido recibido e ingresado a Mi Bodega! (+$myQty $unit)',
+                                            style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF1C1917), fontSize: 13),
+                                          ),
+                                          const Text(
+                                            'Inventario contable actualizado con descuento mayorista.',
+                                            style: TextStyle(fontSize: 11.5, color: Color(0xFF57534E)),
+                                          ),
+                                        ],
+                                      ),
                                     ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            if (!isGoalReached) {
+                              return Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFFBEB),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFFDE68A), width: 1.5),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.hourglass_top_rounded, color: Color(0xFFB45309), size: 20),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            'Aporte activo: $myQty $unit (En espera de meta)',
+                                            style: const TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF92400E), fontSize: 13),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Faltan $remainingQty $unit para completar la meta de ${targetQty.toInt()} $unit. Al completarse, el molino despacha y se habilitará la recepción.',
+                                      style: const TextStyle(fontSize: 11.5, color: Color(0xFF78350F)),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    OutlinedButton.icon(
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(color: Color(0xFFD6D3D1)),
+                                        foregroundColor: const Color(0xFF78716C),
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      icon: const Icon(Icons.lock_outline_rounded, size: 18),
+                                      label: Text(
+                                        '🔒 Esperando meta (${currentQty.toInt()}/${targetQty.toInt()} $unit)',
+                                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                                      ),
+                                      onPressed: () {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(
+                                              '⏳ Esta compra se despachará cuando se completen los $remainingQty $unit restantes.',
+                                            ),
+                                            duration: const Duration(seconds: 3),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            // Meta alcanzada: se habilita la recepción
+                            return Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFECFDF5),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFA7F3D0), width: 1.5),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.local_shipping_rounded, color: Color(0xFF047857), size: 20),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          '🎉 ¡Meta alcanzada! Pedido despachado por el molino.',
+                                          style: const TextStyle(fontWeight: FontWeight.w900, color: Color(0xFF065F46), fontSize: 13),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'La carga ha llegado al circuito comercial. Toca para confirmar entrega y cargar a Mi Bodega.',
+                                    style: TextStyle(fontSize: 11.5, color: Color(0xFF047857)),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      backgroundColor: const Color(0xFF047857),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                    icon: const Icon(Icons.inventory_2_rounded, size: 18),
+                                    label: Text(
+                                      '📦 Recibir pedido en Mi Bodega (+$myQty $unit)',
+                                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                                    ),
+                                    onPressed: () async {
+                                      setState(() {
+                                        _receivedProductIds.add(pid);
+                                      });
+                                      await widget.onReceiveToInventory?.call(
+                                        productId: pid,
+                                        productName: pname,
+                                        quantity: (myContribution['quantity'] as num).toDouble(),
+                                        unit: unit,
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 4),
-                              const Text(
-                                'Al llegar la entrega a tu local, ingresa la mercancía directamente a Mi Bodega con 1 toque.',
-                                style: TextStyle(fontSize: 11.5, color: Color(0xFF047857)),
-                              ),
-                              const SizedBox(height: 10),
-                              FilledButton.icon(
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: const Color(0xFF065F46),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                                icon: const Icon(Icons.inventory_2_rounded, size: 18),
-                                label: Text(
-                                  '📦 Recibir pedido en Mi Bodega (+${(myContribution['quantity'] as num).toInt()} $unit)',
-                                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                                ),
-                                onPressed: () async {
-                                  await widget.onReceiveToInventory?.call(
-                                    productId: pid,
-                                    productName: pname,
-                                    quantity: (myContribution['quantity'] as num).toDouble(),
-                                    unit: unit,
-                                  );
-                                },
-                              ),
-                            ],
-                          ),
+                            );
+                          },
                         ),
                       ],
                     ],
