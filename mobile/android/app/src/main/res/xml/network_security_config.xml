@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- OWASP Mobile M5: Insecure Communication Mitigation -->
+<!-- Enforces TLS/HTTPS by default, permitting cleartext traffic ONLY for local development -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Permitido exclusivamente para emulador Android y red de desarrollo local -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+        <domain includeSubdomains="true">10.209.55.173</domain>
+    </domain-config>
+</network-security-config>

@@ -516,6 +516,14 @@ class OfflineLedgerService {
     required String unit,
     required bool synced,
   }) async {
+    // OWASP Mobile M4: Validación estricta de cantidad
+    if (quantity.isNaN || quantity.isInfinite || quantity <= 0.0) {
+      throw ArgumentError('La cantidad debe ser un número positivo mayor que cero.');
+    }
+    if (quantity > 100000.0) {
+      throw ArgumentError('La cantidad excede el límite operativo permitido.');
+    }
+
     final db = await database;
     final id = _uuid.v4();
     await db.insert('movements', {
