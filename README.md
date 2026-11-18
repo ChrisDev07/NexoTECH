@@ -54,24 +54,32 @@ MyPymes/
 │   └── test_parser.py            # Suite de pruebas unitarias de interpretación lingüística
 ├── backend/                      # Servicios modulares (Event Sourcing + Compras Colectivas)
 │   ├── models.py                 # Contratos y modelos de dominio
+│   ├── auth.py                   # Autenticación PBKDF2 + sal y Ley 1581 de 2012
 │   ├── ledger.py                 # Libro mayor inmutable SQLite y corte diario (00:00–23:59)
 │   ├── collective.py             # Motor independiente de central de compras colectivas
+│   ├── schema_postgres.sql       # Esquema central PostgreSQL 16+ (tablas, vistas e índices)
 │   ├── server.py                 # Servidor REST y despachador de recursos estáticos
 │   ├── simulate_workflow.py      # Validación E2E del flujo operativo y red colectiva
 │   ├── test_ledger.py            # Pruebas unitarias de integridad y corte diario
+│   ├── test_auth.py              # Pruebas unitarias de seguridad y Habeas Data
 │   └── static/                   # Interfaz web modularizada
 │       ├── index.html            # Estructura semántica limpia
 │       ├── css/styles.css        # Sistema de diseño accesible (WCAG AAA)
-│       └── js/                   # Módulos: api.js, voice.js, inventory.js, community.js, app.js
-├── mobile/                       # Cliente móvil multiplataforma modular (Flutter / Dart)
+│       └── js/                   # Módulos: api.js, auth.js, voice.js, inventory.js, community.js, app.js
+├── sync_core/                    # Núcleo de sincronización Offline-First en Rust (SQLite <-> PostgreSQL)
+│   ├── Cargo.toml                # Configuración del crate (lib FFI + binario origo-sync)
+│   ├── README.md                 # Guía de despliegue del núcleo de sincronización
+│   └── src/                      # Módulos: config, models, local_store, remote_pg, sync_engine, lib, main
+├── mobile/                       # Cliente móvil multiplataforma modular (Flutter / Dart + Vosk Offline)
 │   ├── lib/
 │   │   ├── main.dart             # Orquestador principal y navegación
-│   │   ├── models/               # Modelos: product_stock.dart, movement_log.dart
-│   │   ├── screens/              # Pantallas: home_screen, inventory_screen, community_screen
+│   │   ├── models/               # Modelos: merchant_profile, product_stock, movement_log
+│   │   ├── services/             # Servicios: nlp_service, offline_ledger, offline_voice_service, sync_service
+│   │   ├── screens/              # Pantallas: login, home, inventory, community
 │   │   └── widgets/              # Componentes: origo_header, product_card, confirmation_sheet
 │   ├── assets/catalog.json       # Catálogo regional offline
 │   └── pubspec.yaml              # Configuración Flutter
-├── docs/                         # Documentación técnica y guion de presentación
+├── docs/                         # Documentación técnica, arquitectura Rust/PG y guion de presentación
 ├── .gitignore                    # Reglas de exclusión del entorno
 └── README.md                     # Documento técnico principal
 ```

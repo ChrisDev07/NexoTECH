@@ -1,0 +1,23 @@
+[package]
+name = "origo_sync_core"
+version = "0.1.0"
+edition = "2021"
+description = "Núcleo de sincronización offline-first en Rust para Origo (SQLite local <-> PostgreSQL central)"
+
+[lib]
+name = "origo_sync_core"
+crate-type = ["rlib", "cdylib", "staticlib"]
+
+[[bin]]
+name = "origo-sync"
+path = "src/main.rs"
+
+[dependencies]
+chrono = { version = "0.4", features = ["serde"] }
+rusqlite = { version = "0.31", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.38", features = ["full"] }
+tokio-postgres = { version = "0.7", features = ["with-chrono-0_4", "with-uuid-1"] }
+uuid = { version = "1.8", features = ["v4", "serde"] }

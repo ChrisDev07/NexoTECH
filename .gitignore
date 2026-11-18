@@ -50,3 +50,6 @@ Thumbs.db
 plan.md
 *.docx
 *.pdf
+
+# Rust
+sync_core/target/
