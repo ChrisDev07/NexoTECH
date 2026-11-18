@@ -2,8 +2,11 @@
  * Coordinador Principal de Origo (Navegación, Modo Avión y Modal de Confirmación)
  */
 window.OrigoApp = (() => {
-  let isAirplaneMode = false;
   let pendingParsedItems = [];
+
+  function isOnline() {
+    return typeof navigator !== 'undefined' ? navigator.onLine : true;
+  }
 
   function showToast(msg) {
     const t = document.getElementById('toast');
@@ -24,30 +27,15 @@ window.OrigoApp = (() => {
     if (tabName === 'community') window.OrigoCommunity.refresh();
   }
 
-  async function toggleAirplaneMode() {
-    isAirplaneMode = !isAirplaneMode;
-    const pill = document.getElementById('connPill');
-    const icon = document.getElementById('connIcon');
-    const text = document.getElementById('connText');
-
-    if (isAirplaneMode) {
-      pill.classList.add('offline');
-      icon.innerText = '✈️';
-      text.innerText = 'Sin Internet';
-      showToast('✈️ Modo Avión activo · Tus registros se guardan en el equipo');
-    } else {
-      pill.classList.remove('offline');
-      icon.innerText = '🟢';
-      text.innerText = 'Conectado';
+  async function syncOnReconnect() {
+    try {
       const data = await window.OrigoAPI.syncMovements();
-      showToast(
-        data.synced_count > 0
-          ? `☁️ ¡Señal recuperada! ${data.synced_count} movimientos sincronizados`
-          : '🟢 Conectado · Inventario al día'
-      );
+      if (data.synced_count > 0) {
+        showToast(`☁️ ¡Conexión recuperada! ${data.synced_count} movimientos sincronizados`);
+      }
       window.OrigoInventory.refreshStock();
       window.OrigoInventory.refreshMovements();
-    }
+    } catch (_) {}
   }
 
   async function triggerPhrase(phrase) {
@@ -104,14 +92,15 @@ window.OrigoApp = (() => {
 
   async function confirmMovement() {
     if (!pendingParsedItems.length) return;
-    const saveData = await window.OrigoAPI.saveMovements(pendingParsedItems, !isAirplaneMode);
+    const online = isOnline();
+    const saveData = await window.OrigoAPI.saveMovements(pendingParsedItems, online);
     document.getElementById('confirmModal').classList.remove('open');
     window.OrigoVoice.clearTranscript();
     pendingParsedItems = [];
 
-    showToast(isAirplaneMode
-      ? '💾 Guardado en tu teléfono (se sincronizará al volver la señal)'
-      : '✅ ¡Guardado en el inventario del día!');
+    showToast(online
+      ? '✅ ¡Guardado y sincronizado en el inventario del día!'
+      : '💾 Sin internet: guardado localmente (se subirá al recuperar señal)');
 
     if (saveData && saveData.daily_stock) {
       window.OrigoInventory.applyDailyStock(saveData.daily_stock);
@@ -133,6 +122,10 @@ window.OrigoApp = (() => {
   }
 
   function boot() {
+    window.addEventListener('online', syncOnReconnect);
+    window.addEventListener('offline', () => {
+      showToast('✈️ Sin conexión: tus movimientos se guardarán localmente');
+    });
     window.OrigoVoice.init(triggerPhrase);
     window.OrigoAuth.init(() => {
       switchTab('home');
@@ -144,7 +137,6 @@ window.OrigoApp = (() => {
     boot,
     showToast,
     switchTab,
-    toggleAirplaneMode,
     triggerPhrase,
     adjustQty,
     toggleItemAction,
