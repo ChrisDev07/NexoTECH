@@ -194,8 +194,14 @@ window.OrigoInventory = (() => {
     }
   }
 
+  function getProductStock(productId) {
+    const found = allStock.find(i => i.product_id === productId);
+    return found ? Number(found.current_stock || 0) : 0;
+  }
+
   return {
     getIcon,
+    getProductStock,
     applyDailyStock,
     refreshStock,
     refreshMovements,

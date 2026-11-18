@@ -90,7 +90,9 @@ window.OrigoAPI = (() => {
       headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ items, synced })
     });
-    return res.json();
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'No se pudo guardar el movimiento');
+    return data;
   }
 
   async function syncMovements() {

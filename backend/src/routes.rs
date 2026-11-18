@@ -494,6 +494,49 @@ async fn post_movements(
 ) -> Response {
     let business_id = resolve_business_id(&state, &headers);
     let synced = payload.synced.unwrap_or(true);
+    let merged = state
+        .ledger
+        .merged_catalog_for_business(&state.parser.catalog.products, &business_id)
+        .unwrap_or_else(|_| state.parser.catalog.products.clone());
+
+    // Validar existencias antes de registrar salidas (evita ventas imposibles / stock negativo)
+    let current_stock_list = match state.ledger.compute_stock(&merged, &business_id) {
+        Ok(list) => list,
+        Err(e) => {
+            return json_no_cache(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                json!({ "error": e.to_string() }),
+            );
+        }
+    };
+    let mut available_map: std::collections::HashMap<String, f64> = current_stock_list
+        .into_iter()
+        .map(|s| (s.product_id, s.current_stock))
+        .collect();
+
+    for it in &payload.items {
+        let current_qty = available_map.get(&it.product_id).copied().unwrap_or(0.0);
+        if it.action == "SALIDA" {
+            if it.quantity > current_qty + 1e-6 {
+                let msg = if current_qty <= 0.0 {
+                    format!(
+                        "No tienes existencias de {} en bodega (Stock: 0 {}). Registra primero una entrada.",
+                        it.product_name, it.unit
+                    )
+                } else {
+                    format!(
+                        "Stock insuficiente para {}: solo tienes {} {} disponibles y estás intentando sacar {} {}.",
+                        it.product_name, current_qty, it.unit, it.quantity, it.unit
+                    )
+                };
+                return json_no_cache(StatusCode::BAD_REQUEST, json!({ "error": msg }));
+            }
+            available_map.insert(it.product_id.clone(), current_qty - it.quantity);
+        } else {
+            available_map.insert(it.product_id.clone(), current_qty + it.quantity);
+        }
+    }
+
     let mut recorded = Vec::new();
 
     for it in payload.items {
@@ -520,11 +563,6 @@ async fn post_movements(
         }
         recorded.push(mov);
     }
-
-    let merged = state
-        .ledger
-        .merged_catalog_for_business(&state.parser.catalog.products, &business_id)
-        .unwrap_or_else(|_| state.parser.catalog.products.clone());
 
     match state
         .ledger
@@ -1057,5 +1095,108 @@ mod tests {
         assert_eq!(st, StatusCode::OK);
         assert_eq!(col["participating_stores_count"], 5);
         assert_eq!(col["products"][0]["total_quantity"], 80.0);
+    }
+
+    #[tokio::test]
+    async fn test_prevent_sale_exceeding_stock() {
+        let state = AppState::open(":memory:").unwrap();
+        let app = build_router(state, None);
+
+        // Registrar tienda limpia (stock = 0)
+        let (st, reg) = call_json(
+            &app,
+            "POST",
+            "/api/auth/register",
+            None,
+            Some(json!({
+                "phone": "3194443322",
+                "pin": "7777",
+                "owner_name": "Don Luis",
+                "business_name": "Tienda San Luis",
+                "zone": "Yopal",
+                "habeas_data_accepted": true
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::CREATED);
+        let tok = reg["token"].as_str().unwrap();
+
+        // 1. Intentar vender 15 con stock 0 -> 400 Bad Request
+        let (st, err_zero) = call_json(
+            &app,
+            "POST",
+            "/api/movements",
+            Some(tok),
+            Some(json!({
+                "items": [{
+                    "product_id": "prod_arroz_casanare",
+                    "product_name": "Arroz Casanareño",
+                    "action": "SALIDA",
+                    "quantity": 15.0,
+                    "unit": "bultos"
+                }]
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::BAD_REQUEST);
+        assert!(err_zero["error"].as_str().unwrap().contains("existencias"));
+
+        // 2. Registrar entrada de 5 bultos -> OK
+        let (st, _) = call_json(
+            &app,
+            "POST",
+            "/api/movements",
+            Some(tok),
+            Some(json!({
+                "items": [{
+                    "product_id": "prod_arroz_casanare",
+                    "product_name": "Arroz Casanareño",
+                    "action": "ENTRADA",
+                    "quantity": 5.0,
+                    "unit": "bultos"
+                }]
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
+
+        // 3. Intentar vender 15 teniendo 5 -> 400 Bad Request
+        let (st, err_short) = call_json(
+            &app,
+            "POST",
+            "/api/movements",
+            Some(tok),
+            Some(json!({
+                "items": [{
+                    "product_id": "prod_arroz_casanare",
+                    "product_name": "Arroz Casanareño",
+                    "action": "SALIDA",
+                    "quantity": 15.0,
+                    "unit": "bultos"
+                }]
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::BAD_REQUEST);
+        assert!(err_short["error"].as_str().unwrap().contains("insuficiente"));
+
+        // 4. Vender 5 (exacto) -> OK
+        let (st, _) = call_json(
+            &app,
+            "POST",
+            "/api/movements",
+            Some(tok),
+            Some(json!({
+                "items": [{
+                    "product_id": "prod_arroz_casanare",
+                    "product_name": "Arroz Casanareño",
+                    "action": "SALIDA",
+                    "quantity": 5.0,
+                    "unit": "bultos"
+                }]
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
     }
 }

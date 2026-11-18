@@ -54,9 +54,23 @@ window.OrigoApp = (() => {
     const container = document.getElementById('receiptItemsContainer');
     container.innerHTML = '';
 
+    let hasInsufficientStock = false;
+
     pendingParsedItems.forEach((item, idx) => {
       const isOut = item.action === 'SALIDA';
       const icon = window.OrigoInventory.getIcon(item.product_id);
+      const available = window.OrigoInventory.getProductStock(item.product_id);
+      const exceeds = isOut && item.quantity > available;
+      if (exceeds) hasInsufficientStock = true;
+
+      const stockWarning = exceeds
+        ? `<div style="margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #fee2e2; color: #991b1b; font-size: 0.85rem; font-weight: 700;">
+             ${available <= 0
+               ? `⚠️ Sin existencias en bodega (Stock: 0 ${item.unit}). Registra primero una entrada.`
+               : `⚠️ Stock insuficiente: solo tienes ${available} ${item.unit} disponibles.`}
+           </div>`
+        : '';
+
       const div = document.createElement('div');
       div.className = 'receipt-item';
       div.innerHTML = `
@@ -64,7 +78,7 @@ window.OrigoApp = (() => {
           <button class="action-toggle ${isOut ? 'out' : 'in'}" onclick="OrigoApp.toggleItemAction(${idx})">
             ${isOut ? '📤 Venta realizada' : '📥 Mercancía recibida'} ⇄
           </button>
-          <span class="certainty-badge">✨ ${Math.round(item.confidence * 100)}% Entendido</span>
+          <span class="certainty-badge">📦 Stock: ${available} ${item.unit}</span>
         </div>
         <div class="receipt-prod">
           <span>${icon}</span>
@@ -75,9 +89,17 @@ window.OrigoApp = (() => {
           <span class="stepper-val">${item.quantity} ${item.unit}</span>
           <button class="btn-step" onclick="OrigoApp.adjustQty(${idx}, 1)">+</button>
         </div>
+        ${stockWarning}
       `;
       container.appendChild(div);
     });
+
+    const confirmBtn = document.querySelector('#confirmModal .btn-confirm-big');
+    if (confirmBtn) {
+      confirmBtn.disabled = hasInsufficientStock;
+      confirmBtn.style.opacity = hasInsufficientStock ? '0.45' : '1';
+      confirmBtn.style.cursor = hasInsufficientStock ? 'not-allowed' : 'pointer';
+    }
   }
 
   function adjustQty(idx, delta) {
@@ -93,21 +115,25 @@ window.OrigoApp = (() => {
   async function confirmMovement() {
     if (!pendingParsedItems.length) return;
     const online = isOnline();
-    const saveData = await window.OrigoAPI.saveMovements(pendingParsedItems, online);
-    document.getElementById('confirmModal').classList.remove('open');
-    window.OrigoVoice.clearTranscript();
-    pendingParsedItems = [];
+    try {
+      const saveData = await window.OrigoAPI.saveMovements(pendingParsedItems, online);
+      document.getElementById('confirmModal').classList.remove('open');
+      window.OrigoVoice.clearTranscript();
+      pendingParsedItems = [];
 
-    showToast(online
-      ? '✅ ¡Guardado y sincronizado en el inventario del día!'
-      : '💾 Sin internet: guardado localmente (se subirá al recuperar señal)');
+      showToast(online
+        ? '✅ ¡Guardado y sincronizado en el inventario del día!'
+        : '💾 Sin internet: guardado localmente (se subirá al recuperar señal)');
 
-    if (saveData && saveData.daily_stock) {
-      window.OrigoInventory.applyDailyStock(saveData.daily_stock);
-    } else {
-      await window.OrigoInventory.refreshStock();
+      if (saveData && saveData.daily_stock) {
+        window.OrigoInventory.applyDailyStock(saveData.daily_stock);
+      } else {
+        await window.OrigoInventory.refreshStock();
+      }
+      await window.OrigoInventory.refreshMovements();
+    } catch (err) {
+      showToast(`⚠️ ${err.message}`);
     }
-    await window.OrigoInventory.refreshMovements();
   }
 
   function cancelMovement() {
