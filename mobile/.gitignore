@@ -46,3 +46,6 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Modelo acústico Vosk descargable para compilación local (39 MB)
+android/app/src/main/assets/model-es.zip

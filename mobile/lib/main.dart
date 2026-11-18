@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart';
 import 'models/merchant_profile.dart';
 import 'models/movement_log.dart';
 import 'models/product_stock.dart';
@@ -9,6 +8,7 @@ import 'screens/inventory_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/nlp_service.dart';
 import 'services/offline_ledger.dart';
+import 'services/offline_voice_service.dart';
 import 'widgets/confirmation_sheet.dart';
 import 'widgets/origo_header.dart';
 
@@ -50,13 +50,13 @@ class OrigoHomeShell extends StatefulWidget {
 class _OrigoHomeShellState extends State<OrigoHomeShell> {
   final RegionalNlpService _nlp = RegionalNlpService();
   final OfflineLedgerService _ledger = OfflineLedgerService();
-  final SpeechToText _speech = SpeechToText();
+  final OfflineVoiceService _voice = OfflineVoiceService();
 
   MerchantProfile? _currentUser;
   int _selectedTab = 0;
   bool _isOfflineMode = true;
   bool _isListening = false;
-  bool _speechReady = false;
+  bool _isVoiceModelReady = false;
   bool _isHistoryExpanded = true;
   int _extraCollectiveBultos = 0;
   String _liveTranscript = '';
@@ -155,21 +155,63 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   Future<void> _initServices() async {
     await _nlp.loadCatalog();
     await _loadLedgerFromSqlite();
-    _speechReady = await _speech.initialize(
-      onStatus: (status) {
-        if (status == 'done' || status == 'notListening') {
-          if (mounted && _isListening) {
-            setState(() => _isListening = false);
-            if (_liveTranscript.trim().isNotEmpty) {
-              _handleSpokenPhrase(_liveTranscript);
-            }
-          }
-        }
-      },
-      onError: (_) {
-        if (mounted) setState(() => _isListening = false);
-      },
-    );
+
+    _voice.onModelStatus = (status) {
+      if (!mounted) return;
+      if (status == 'ready') {
+        setState(() => _isVoiceModelReady = true);
+      } else if (status.startsWith('error:')) {
+        setState(() => _isVoiceModelReady = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('⚠️ ${status.substring(6)}')),
+        );
+      }
+    };
+
+    _voice.onListeningStarted = () {
+      if (!mounted) return;
+      setState(() {
+        _isListening = true;
+        _liveTranscript = '';
+      });
+    };
+
+    _voice.onPartial = (partial) {
+      if (!mounted) return;
+      setState(() => _liveTranscript = partial);
+    };
+
+    _voice.onFinal = (finalText) {
+      if (!mounted) return;
+      setState(() {
+        _isListening = false;
+        if (finalText.isNotEmpty) _liveTranscript = finalText;
+      });
+      if (finalText.trim().isNotEmpty) {
+        _handleSpokenPhrase(finalText);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('⚠️ No se escuchó voz. Habla cerca del micrófono e intenta de nuevo.')),
+        );
+      }
+    };
+
+    _voice.onError = (err) {
+      if (!mounted) return;
+      setState(() => _isListening = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('⚠️ $err')),
+      );
+    };
+
+    try {
+      final ready = await _voice.init();
+      if (mounted && ready) {
+        setState(() => _isVoiceModelReady = true);
+      }
+    } catch (_) {
+      // En tests unitarios sin plataforma Android el MethodChannel no está registrado
+    }
   }
 
   Future<void> _loadLedgerFromSqlite() async {
@@ -222,50 +264,30 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
 
   Future<void> _toggleMic() async {
     if (_isListening) {
-      await _speech.stop();
-      setState(() => _isListening = false);
-      if (_liveTranscript.trim().isNotEmpty) {
-        _handleSpokenPhrase(_liveTranscript);
-      }
+      await _voice.stopListening();
       return;
     }
 
-    if (!_speechReady) {
-      _speechReady = await _speech.initialize();
-    }
+    final status = await _voice.startListening();
+    if (!mounted) return;
 
-    if (!_speechReady) {
-      if (!mounted) return;
+    if (status == 'listening') {
+      setState(() {
+        _liveTranscript = '';
+        _isListening = true;
+      });
+    } else if (status == 'loading_model') {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Permite el micrófono para dictar por voz.')),
+        const SnackBar(content: Text('⏳ Terminando de cargar el modelo de voz sin internet... intenta en 2 segundos.')),
       );
-      return;
     }
-
-    setState(() {
-      _liveTranscript = '';
-      _isListening = true;
-    });
-
-    await _speech.listen(
-      localeId: 'es_CO',
-      listenOptions: SpeechListenOptions(partialResults: true),
-      onResult: (res) {
-        if (!mounted) return;
-        setState(() => _liveTranscript = res.recognizedWords);
-        if (res.finalResult && res.recognizedWords.trim().isNotEmpty) {
-          setState(() => _isListening = false);
-          _handleSpokenPhrase(res.recognizedWords);
-        }
-      },
-    );
   }
 
   void _handleSpokenPhrase(String phrase) {
     final parsed = _nlp.parsePhrase(phrase);
     if (parsed.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('⚠️ No reconocí un producto en: "$phrase"')),
+        SnackBar(content: Text('⚠️ Escuché "$phrase", pero no reconocí un producto del catálogo.')),
       );
       return;
     }
@@ -346,6 +368,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
               children: [
                 HomeScreen(
                   isListening: _isListening,
+                  isVoiceModelReady: _isVoiceModelReady,
                   liveTranscript: _liveTranscript,
                   lowStockCount: lowCount,
                   isHistoryExpanded: _isHistoryExpanded,

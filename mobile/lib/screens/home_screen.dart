@@ -3,6 +3,7 @@ import '../models/movement_log.dart';
 
 class HomeScreen extends StatelessWidget {
   final bool isListening;
+  final bool isVoiceModelReady;
   final String liveTranscript;
   final int lowStockCount;
   final bool isHistoryExpanded;
@@ -14,6 +15,7 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
     required this.isListening,
+    this.isVoiceModelReady = true,
     this.liveTranscript = '',
     required this.lowStockCount,
     required this.isHistoryExpanded,
@@ -65,7 +67,12 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Text(
-                isListening ? '🔴 Escuchando... Habla ahora' : 'Presiona para hablar',
+                isListening
+                    ? '🔴 Escuchando... Toca al terminar'
+                    : (isVoiceModelReady
+                        ? 'Presiona para hablar (100% Offline)'
+                        : '⏳ Preparando voz sin internet...'),
+                textAlign: TextAlign.center,
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 16,
