@@ -175,7 +175,10 @@
 
           <div class="section-head" style="margin-bottom: 8px;">
             <div class="section-title" style="font-size: 1rem;">Productos en bodega</div>
-            <span id="bodegaCountTag" style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);">8 productos</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="bodegaCountTag" style="font-size: 0.82rem; font-weight: 700; color: var(--text-muted);">8 productos</span>
+              <button type="button" class="filter-pill active" style="padding: 6px 12px; font-size: 0.8rem;" onclick="OrigoInventory.openNewProductModal()">+ Nuevo producto</button>
+            </div>
           </div>
 
           <div id="categoryFilters" class="filter-scroll">
@@ -272,6 +275,55 @@
       <div id="receiptItemsContainer"></div>
       <button class="btn-confirm-big" onclick="OrigoApp.confirmMovement()">✔ Sí, es correcto (Guardar)</button>
       <button class="btn-cancel-big" onclick="OrigoApp.cancelMovement()">❌ Descartar o volver a hablar</button>
+    </div>
+  </div>
+
+  <!-- MODAL NUEVO PRODUCTO EN MI BODEGA -->
+  <div id="newProductModal" class="modal-backdrop" onclick="if(event.target === this) OrigoInventory.closeNewProductModal()">
+    <div class="bottom-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title" style="font-size: 1.15rem;">➕ Nuevo producto en Mi Bodega</div>
+      <div class="sheet-sub">Aparecerá al instante en tu inventario y el dictado por voz</div>
+      <form onsubmit="OrigoInventory.submitNewProduct(event)">
+        <label class="auth-label" for="npName">Nombre del producto</label>
+        <input id="npName" class="auth-input" type="text" placeholder="Ej. Café Tostado Yopal" required />
+
+        <label class="auth-label" for="npCategory">Categoría</label>
+        <select id="npCategory" class="auth-input">
+          <option value="Víveres">Víveres</option>
+          <option value="Granos y Víveres">Granos y Víveres</option>
+          <option value="Perecederos">Perecederos</option>
+          <option value="Agroinsumos">Agroinsumos</option>
+          <option value="Ferretería">Ferretería</option>
+          <option value="Mi Tienda">Mi Tienda</option>
+        </select>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label class="auth-label" for="npUnit">Unidad</label>
+            <select id="npUnit" class="auth-input">
+              <option value="unidades">unidades</option>
+              <option value="bultos">bultos</option>
+              <option value="cajas">cajas</option>
+              <option value="pacas">pacas</option>
+              <option value="arrobas">arrobas</option>
+              <option value="kilos">kilos</option>
+              <option value="libras">libras</option>
+              <option value="botellas">botellas</option>
+            </select>
+          </div>
+          <div>
+            <label class="auth-label" for="npMin">Stock mínimo</label>
+            <input id="npMin" class="auth-input" type="number" min="1" value="5" required />
+          </div>
+        </div>
+
+        <label class="auth-label" for="npSynonyms">Apodos de voz (opcional, separados por coma)</label>
+        <input id="npSynonyms" class="auth-input" type="text" placeholder="Ej. cafe, cafecito, tinto" />
+
+        <button type="submit" class="btn-confirm-big" style="margin-top: 12px;">✔ Guardar producto</button>
+        <button type="button" class="btn-cancel-big" onclick="OrigoInventory.closeNewProductModal()">Cancelar</button>
+      </form>
     </div>
   </div>
 

@@ -174,11 +174,31 @@ window.OrigoAPI = (() => {
   }
 
   async function getCollectiveSummary() {
-    const res = await fetch('/api/collective/simulate', {
-      method: 'POST',
-      headers: authHeaders()
+    const res = await fetch('/api/collective', {
+      headers: authHeaders(),
+      cache: 'no-store'
     });
     return res.json();
+  }
+
+  async function joinCollectiveOrder(quantity = 10) {
+    const res = await fetch('/api/collective/join', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ quantity })
+    });
+    return res.json();
+  }
+
+  async function createCustomProduct(payload) {
+    const res = await fetch('/api/products', {
+      method: 'POST',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Error al crear producto');
+    return data;
   }
 
   return {
@@ -193,6 +213,8 @@ window.OrigoAPI = (() => {
     syncMovements,
     getMovements,
     getDailyStock,
-    getCollectiveSummary
+    getCollectiveSummary,
+    joinCollectiveOrder,
+    createCustomProduct
   };
 })();

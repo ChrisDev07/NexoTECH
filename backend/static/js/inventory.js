@@ -157,12 +157,52 @@ window.OrigoInventory = (() => {
     btn.setAttribute('aria-expanded', String(!isNowCollapsed));
   }
 
+  function openNewProductModal() {
+    document.getElementById('npName').value = '';
+    document.getElementById('npSynonyms').value = '';
+    document.getElementById('npMin').value = '5';
+    document.getElementById('newProductModal').classList.add('open');
+  }
+
+  function closeNewProductModal() {
+    document.getElementById('newProductModal').classList.remove('open');
+  }
+
+  async function submitNewProduct(e) {
+    if (e) e.preventDefault();
+    const name = document.getElementById('npName').value.trim();
+    const category = document.getElementById('npCategory').value;
+    const default_unit = document.getElementById('npUnit').value;
+    const min_threshold = Number(document.getElementById('npMin').value) || 5;
+    const rawSyn = document.getElementById('npSynonyms').value.trim();
+    const synonyms = rawSyn ? rawSyn.split(',').map(s => s.trim()).filter(Boolean) : [name.toLowerCase()];
+
+    try {
+      const res = await window.OrigoAPI.createCustomProduct({
+        name,
+        category,
+        default_unit,
+        min_threshold,
+        synonyms
+      });
+      closeNewProductModal();
+      if (res.daily_stock) applyDailyStock(res.daily_stock);
+      else await refreshStock();
+      window.OrigoApp.showToast(`✅ Producto "${name}" agregado a tu bodega y al dictado por voz`);
+    } catch (err) {
+      window.OrigoApp.showToast(`⚠️ ${err.message}`);
+    }
+  }
+
   return {
     getIcon,
     applyDailyStock,
     refreshStock,
     refreshMovements,
     filterCategory,
-    toggleHistory
+    toggleHistory,
+    openNewProductModal,
+    closeNewProductModal,
+    submitNewProduct
   };
 })();

@@ -1,12 +1,13 @@
 //! Libro Mayor Inmutable (Event Sourcing Ledger) en Rust + SQLite para Origo.
 //! Garantiza cero pérdida de información y cálculo diario exacto (00:00 – 23:59).
 
+use crate::collective::CollectiveOrderInput;
 use crate::models::{
     now_unix_secs, round2, CatalogProduct, DailyStockItem, DailyStockResponse, DailyStockSummary,
     Movement, MovementView, StockItem,
 };
 use chrono::{Local, NaiveDate, TimeZone};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -58,8 +59,9 @@ impl LocalLedger {
 
     fn create_tables(&self) -> rusqlite::Result<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS movements (
+        conn.execute_batch(
+            "
+            CREATE TABLE IF NOT EXISTS movements (
                 id TEXT PRIMARY KEY,
                 business_id TEXT NOT NULL,
                 product_id TEXT NOT NULL,
@@ -70,8 +72,33 @@ impl LocalLedger {
                 timestamp REAL NOT NULL,
                 device_id TEXT NOT NULL,
                 synced INTEGER NOT NULL
-            )",
-            [],
+            );
+            CREATE TABLE IF NOT EXISTS custom_products (
+                id TEXT PRIMARY KEY,
+                business_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL,
+                default_unit TEXT NOT NULL,
+                min_threshold REAL NOT NULL,
+                retail_price_cop REAL NOT NULL DEFAULT 0,
+                wholesale_price_cop REAL NOT NULL DEFAULT 0,
+                synonyms_json TEXT NOT NULL DEFAULT '[]',
+                created_at REAL NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS collective_contributions (
+                id TEXT PRIMARY KEY,
+                zone TEXT NOT NULL,
+                business_id TEXT NOT NULL,
+                business_name TEXT NOT NULL,
+                product_id TEXT NOT NULL,
+                product_name TEXT NOT NULL,
+                quantity REAL NOT NULL,
+                unit TEXT NOT NULL,
+                retail_price_cop REAL NOT NULL,
+                wholesale_price_cop REAL NOT NULL,
+                created_at REAL NOT NULL
+            );
+            ",
         )?;
         Ok(())
     }
@@ -369,6 +396,7 @@ impl LocalLedger {
     }
 
     pub fn seed_demo_data(&self, force: bool) -> rusqlite::Result<()> {
+        self.seed_collective_baseline(force)?;
         if !force && !self.get_all_movements(Some("tienda_demo"))?.is_empty() {
             return Ok(());
         }
@@ -376,6 +404,188 @@ impl LocalLedger {
             self.clear_business_movements("tienda_demo")?;
         }
         self.seed_opening_stock_for_business("tienda_demo", true)
+    }
+
+    // --- PRODUCTOS PERSONALIZADOS POR TIENDA ---
+
+    pub fn upsert_custom_product(
+        &self,
+        business_id: &str,
+        prod: &CatalogProduct,
+    ) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let syn_json = serde_json::to_string(&prod.synonyms).unwrap_or_else(|_| "[]".to_string());
+        conn.execute(
+            "INSERT OR REPLACE INTO custom_products
+            (id, business_id, name, category, default_unit, min_threshold, retail_price_cop, wholesale_price_cop, synonyms_json, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            params![
+                prod.id,
+                business_id,
+                prod.name,
+                prod.category,
+                prod.default_unit,
+                prod.min_threshold,
+                prod.retail_price_cop,
+                prod.wholesale_price_cop,
+                syn_json,
+                now_unix_secs()
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn get_custom_products(&self, business_id: &str) -> rusqlite::Result<Vec<CatalogProduct>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT id, name, category, default_unit, min_threshold, retail_price_cop, wholesale_price_cop, synonyms_json
+             FROM custom_products WHERE business_id = ?1 ORDER BY created_at ASC",
+        )?;
+        let rows = stmt.query_map(params![business_id], |r| {
+            let syn_raw: String = r.get(7)?;
+            let synonyms: Vec<String> = serde_json::from_str(&syn_raw).unwrap_or_default();
+            Ok(CatalogProduct {
+                id: r.get(0)?,
+                name: r.get(1)?,
+                category: r.get(2)?,
+                default_unit: r.get(3)?,
+                min_threshold: r.get(4)?,
+                retail_price_cop: r.get(5)?,
+                wholesale_price_cop: r.get(6)?,
+                synonyms,
+            })
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
+    }
+
+    pub fn merged_catalog_for_business(
+        &self,
+        base_catalog: &[CatalogProduct],
+        business_id: &str,
+    ) -> rusqlite::Result<Vec<CatalogProduct>> {
+        let mut merged = base_catalog.to_vec();
+        let custom = self.get_custom_products(business_id)?;
+        for cp in custom {
+            if let Some(pos) = merged.iter().position(|p| p.id == cp.id) {
+                merged[pos] = cp;
+            } else {
+                merged.push(cp);
+            }
+        }
+        Ok(merged)
+    }
+
+    // --- CENTRAL DE COMPRAS COLECTIVAS PERSISTENTE ---
+
+    pub fn seed_collective_baseline(&self, force: bool) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        if force {
+            conn.execute("DELETE FROM collective_contributions", [])?;
+        }
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM collective_contributions",
+            [],
+            |r| r.get(0),
+        )?;
+        if count > 0 {
+            return Ok(());
+        }
+        let now = now_unix_secs();
+        let defaults = [
+            ("col_demo_1", "Comuna 2, Yopal", "tienda_demo", "Tienda La Esperanza", 15.0),
+            ("col_demo_2", "Comuna 2, Yopal", "t2", "Agroinsumos Doña Martha", 25.0),
+            ("col_demo_3", "Comuna 2, Yopal", "t3", "Minimarket El Llano", 20.0),
+            ("col_demo_4", "Comuna 2, Yopal", "t4", "Comercializadora El Triunfo", 10.0),
+        ];
+        for (id, zone, bid, bname, qty) in defaults {
+            conn.execute(
+                "INSERT INTO collective_contributions
+                (id, zone, business_id, business_name, product_id, product_name, quantity, unit, retail_price_cop, wholesale_price_cop, created_at)
+                VALUES (?1, ?2, ?3, ?4, 'prod_arroz_casanare', 'Arroz Casanareño', ?5, 'bultos', 185000.0, 155000.0, ?6)",
+                params![id, zone, bid, bname, qty, now],
+            )?;
+        }
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_collective_contribution(
+        &self,
+        zone: &str,
+        business_id: &str,
+        business_name: &str,
+        product_id: &str,
+        product_name: &str,
+        quantity: f64,
+        unit: &str,
+        retail_price_cop: f64,
+        wholesale_price_cop: f64,
+    ) -> rusqlite::Result<()> {
+        let conn = self.conn.lock().unwrap();
+        let existing: Option<(String, f64)> = conn
+            .query_row(
+                "SELECT id, quantity FROM collective_contributions WHERE business_id = ?1 AND product_id = ?2",
+                params![business_id, product_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()?;
+
+        if let Some((existing_id, current_qty)) = existing {
+            conn.execute(
+                "UPDATE collective_contributions SET quantity = ?1, business_name = ?2, zone = ?3 WHERE id = ?4",
+                params![current_qty + quantity, business_name, zone, existing_id],
+            )?;
+        } else {
+            let new_id = format!("col_{}", uuid::Uuid::new_v4());
+            conn.execute(
+                "INSERT INTO collective_contributions
+                (id, zone, business_id, business_name, product_id, product_name, quantity, unit, retail_price_cop, wholesale_price_cop, created_at)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                params![
+                    new_id,
+                    zone,
+                    business_id,
+                    business_name,
+                    product_id,
+                    product_name,
+                    quantity,
+                    unit,
+                    retail_price_cop,
+                    wholesale_price_cop,
+                    now_unix_secs()
+                ],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn get_collective_contributions(&self) -> rusqlite::Result<Vec<CollectiveOrderInput>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare(
+            "SELECT business_id, business_name, product_id, product_name, quantity, unit, retail_price_cop, wholesale_price_cop
+             FROM collective_contributions ORDER BY created_at ASC",
+        )?;
+        let rows = stmt.query_map([], |r| {
+            Ok(CollectiveOrderInput {
+                business_id: r.get(0)?,
+                business_name: r.get(1)?,
+                product_id: r.get(2)?,
+                product_name: r.get(3)?,
+                quantity: r.get(4)?,
+                unit: r.get(5)?,
+                retail_price_cop: r.get(6)?,
+                wholesale_price_cop: r.get(7)?,
+            })
+        })?;
+        let mut out = Vec::new();
+        for row in rows {
+            out.push(row?);
+        }
+        Ok(out)
     }
 
     fn row_to_movement(r: &rusqlite::Row<'_>) -> rusqlite::Result<Movement> {

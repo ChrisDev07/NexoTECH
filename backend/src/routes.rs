@@ -2,9 +2,9 @@
 //! Mantiene 100% compatibilidad con la app móvil Flutter y la interfaz web existente.
 
 use crate::auth::{privacy_policy_ley_1581, AuthManager};
-use crate::collective::{CollectiveOrderInput, CollectivePurchasingEngine};
+use crate::collective::CollectivePurchasingEngine;
 use crate::ledger::LocalLedger;
-use crate::models::{now_unix_secs, Movement, PublicUser};
+use crate::models::{now_unix_secs, CatalogProduct, Movement, PublicUser};
 use crate::nlp::RegionalNlpParser;
 use axum::extract::State;
 use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
@@ -50,13 +50,17 @@ pub fn build_router(state: Arc<AppState>, static_dir: Option<PathBuf>) -> Router
         .route("/api/auth/login", post(auth_login))
         .route("/api/auth/logout", post(auth_logout))
         .route("/api/catalog", get(get_catalog))
+        .route("/api/products", get(get_products).post(post_product))
         .route("/api/nlp/parse", post(nlp_parse))
         .route("/api/stock", get(get_stock))
         .route("/api/stock/daily", get(get_daily_stock))
         .route("/api/movements", get(get_movements).post(post_movements))
         .route("/api/sync/users", post(sync_users))
+        .route("/api/sync/products", post(sync_products))
         .route("/api/sync/movements", post(sync_movements))
         .route("/api/sync", post(sync_local))
+        .route("/api/collective", get(get_collective))
+        .route("/api/collective/join", post(join_collective))
         .route("/api/collective/simulate", post(collective_simulate))
         .route("/api/reset", post(reset_demo))
         .with_state(state)
@@ -196,6 +200,211 @@ async fn get_catalog(State(state): State<Arc<AppState>>) -> Response {
     json_no_cache(StatusCode::OK, json!(state.parser.catalog))
 }
 
+async fn get_products(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let business_id = resolve_business_id(&state, &headers);
+    match state.ledger.get_custom_products(&business_id) {
+        Ok(custom) => json_no_cache(
+            StatusCode::OK,
+            json!({
+                "business_id": business_id,
+                "custom_products": custom
+            }),
+        ),
+        Err(e) => json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        ),
+    }
+}
+
+#[derive(Deserialize, Default)]
+struct CreateProductPayload {
+    #[serde(default)]
+    id: String,
+    #[serde(default)]
+    name: String,
+    #[serde(default)]
+    category: String,
+    #[serde(default)]
+    default_unit: String,
+    #[serde(default)]
+    min_threshold: f64,
+    #[serde(default)]
+    retail_price_cop: f64,
+    #[serde(default)]
+    wholesale_price_cop: f64,
+    #[serde(default)]
+    synonyms: Vec<String>,
+}
+
+async fn post_product(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<CreateProductPayload>,
+) -> Response {
+    let business_id = resolve_business_id(&state, &headers);
+    let clean_name = payload.name.trim();
+    if clean_name.chars().count() < 2 {
+        return json_no_cache(
+            StatusCode::BAD_REQUEST,
+            json!({ "error": "Escribe el nombre del producto (mínimo 2 caracteres)." }),
+        );
+    }
+
+    let prod_id = if payload.id.trim().is_empty() {
+        format!(
+            "prod_custom_{}",
+            &uuid::Uuid::new_v4().to_string()[..8]
+        )
+    } else {
+        payload.id.trim().to_string()
+    };
+
+    let mut synonyms = payload.synonyms;
+    if synonyms.is_empty() {
+        synonyms.push(clean_name.to_lowercase());
+    }
+
+    let prod = CatalogProduct {
+        id: prod_id,
+        name: clean_name.to_string(),
+        category: if payload.category.trim().is_empty() {
+            "Mi Tienda".to_string()
+        } else {
+            payload.category.trim().to_string()
+        },
+        default_unit: if payload.default_unit.trim().is_empty() {
+            "unidades".to_string()
+        } else {
+            payload.default_unit.trim().to_lowercase()
+        },
+        min_threshold: if payload.min_threshold > 0.0 {
+            payload.min_threshold
+        } else {
+            5.0
+        },
+        retail_price_cop: payload.retail_price_cop,
+        wholesale_price_cop: payload.wholesale_price_cop,
+        synonyms,
+    };
+
+    if let Err(e) = state.ledger.upsert_custom_product(&business_id, &prod) {
+        return json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        );
+    }
+
+    let merged = state
+        .ledger
+        .merged_catalog_for_business(&state.parser.catalog.products, &business_id)
+        .unwrap_or_else(|_| state.parser.catalog.products.clone());
+
+    match state
+        .ledger
+        .compute_daily_stock(&merged, &business_id, None)
+    {
+        Ok(daily_stock) => json_no_cache(
+            StatusCode::CREATED,
+            json!({
+                "status": "ok",
+                "product": prod,
+                "daily_stock": daily_stock
+            }),
+        ),
+        Err(e) => json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        ),
+    }
+}
+
+async fn sync_products(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<Value>,
+) -> Response {
+    let fallback_bid = resolve_business_id(&state, &headers);
+    let incoming = payload
+        .get("products")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    let mut synced_ids = Vec::new();
+    for p in incoming {
+        let Some(id) = p.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(name) = p.get("name").and_then(Value::as_str) else {
+            continue;
+        };
+        let bid = p
+            .get("business_id")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&fallback_bid);
+        let synonyms: Vec<String> = match p.get("synonyms") {
+            Some(Value::Array(arr)) => arr
+                .iter()
+                .filter_map(Value::as_str)
+                .map(ToString::to_string)
+                .collect(),
+            Some(Value::String(s)) => s
+                .split(',')
+                .map(|x| x.trim().to_string())
+                .filter(|x| !x.is_empty())
+                .collect(),
+            _ => vec![name.to_lowercase()],
+        };
+        let prod = CatalogProduct {
+            id: id.to_string(),
+            name: name.to_string(),
+            category: p
+                .get("category")
+                .and_then(Value::as_str)
+                .unwrap_or("Mi Tienda")
+                .to_string(),
+            default_unit: p
+                .get("default_unit")
+                .or_else(|| p.get("unit"))
+                .and_then(Value::as_str)
+                .unwrap_or("unidades")
+                .to_string(),
+            min_threshold: p
+                .get("min_threshold")
+                .and_then(Value::as_f64)
+                .unwrap_or(5.0),
+            retail_price_cop: p
+                .get("retail_price_cop")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0),
+            wholesale_price_cop: p
+                .get("wholesale_price_cop")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0),
+            synonyms,
+        };
+        if let Err(e) = state.ledger.upsert_custom_product(bid, &prod) {
+            return json_no_cache(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                json!({ "error": e.to_string() }),
+            );
+        }
+        synced_ids.push(id.to_string());
+    }
+
+    let synced_count = synced_ids.len();
+    json_no_cache(
+        StatusCode::OK,
+        json!({
+            "status": "ok",
+            "synced_ids": synced_ids,
+            "synced_count": synced_count
+        }),
+    )
+}
+
 #[derive(Deserialize, Default)]
 struct NlpPayload {
     #[serde(default)]
@@ -204,18 +413,27 @@ struct NlpPayload {
 
 async fn nlp_parse(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(payload): Json<NlpPayload>,
 ) -> Response {
-    let items = state.parser.parse_phrase(&payload.phrase);
+    let business_id = resolve_business_id(&state, &headers);
+    let custom = state
+        .ledger
+        .get_custom_products(&business_id)
+        .unwrap_or_default();
+    let items = state
+        .parser
+        .parse_phrase_with_extra_products(&payload.phrase, &custom);
     json_no_cache(StatusCode::OK, json!(items))
 }
 
 async fn get_stock(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let business_id = resolve_business_id(&state, &headers);
-    match state
+    let merged = state
         .ledger
-        .compute_stock(&state.parser.catalog.products, &business_id)
-    {
+        .merged_catalog_for_business(&state.parser.catalog.products, &business_id)
+        .unwrap_or_else(|_| state.parser.catalog.products.clone());
+    match state.ledger.compute_stock(&merged, &business_id) {
         Ok(stock) => json_no_cache(StatusCode::OK, json!(stock)),
         Err(e) => json_no_cache(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -226,9 +444,13 @@ async fn get_stock(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Re
 
 async fn get_daily_stock(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let business_id = resolve_business_id(&state, &headers);
+    let merged = state
+        .ledger
+        .merged_catalog_for_business(&state.parser.catalog.products, &business_id)
+        .unwrap_or_else(|_| state.parser.catalog.products.clone());
     match state
         .ledger
-        .compute_daily_stock(&state.parser.catalog.products, &business_id, None)
+        .compute_daily_stock(&merged, &business_id, None)
     {
         Ok(daily) => json_no_cache(StatusCode::OK, json!(daily)),
         Err(e) => json_no_cache(
@@ -299,9 +521,14 @@ async fn post_movements(
         recorded.push(mov);
     }
 
+    let merged = state
+        .ledger
+        .merged_catalog_for_business(&state.parser.catalog.products, &business_id)
+        .unwrap_or_else(|_| state.parser.catalog.products.clone());
+
     match state
         .ledger
-        .compute_daily_stock(&state.parser.catalog.products, &business_id, None)
+        .compute_daily_stock(&merged, &business_id, None)
     {
         Ok(daily_stock) => json_no_cache(
             StatusCode::OK,
@@ -464,9 +691,14 @@ async fn sync_movements(
         synced_ids.push(mov.id);
     }
 
+    let merged = state
+        .ledger
+        .merged_catalog_for_business(&state.parser.catalog.products, &last_business_id)
+        .unwrap_or_else(|_| state.parser.catalog.products.clone());
+
     match state
         .ledger
-        .compute_daily_stock(&state.parser.catalog.products, &last_business_id, None)
+        .compute_daily_stock(&merged, &last_business_id, None)
     {
         Ok(daily_stock) => {
             let synced_count = synced_ids.len();
@@ -511,65 +743,104 @@ async fn sync_local(State(state): State<Arc<AppState>>, headers: HeaderMap) -> R
     )
 }
 
+async fn get_collective(State(state): State<Arc<AppState>>) -> Response {
+    match state.ledger.get_collective_contributions() {
+        Ok(orders) => {
+            let summary = state.collective.aggregate_orders(&orders);
+            json_no_cache(StatusCode::OK, json!(summary))
+        }
+        Err(e) => json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        ),
+    }
+}
+
 async fn collective_simulate(
     State(state): State<Arc<AppState>>,
+    _headers: HeaderMap,
+) -> Response {
+    get_collective(State(state)).await
+}
+
+#[derive(Deserialize, Default)]
+struct JoinCollectivePayload {
+    #[serde(default)]
+    business_id: String,
+    #[serde(default)]
+    business_name: String,
+    #[serde(default)]
+    zone: String,
+    #[serde(default)]
+    product_id: String,
+    #[serde(default)]
+    product_name: String,
+    quantity: Option<f64>,
+    #[serde(default)]
+    unit: String,
+    retail_price_cop: Option<f64>,
+    wholesale_price_cop: Option<f64>,
+}
+
+async fn join_collective(
+    State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    Json(payload): Json<JoinCollectivePayload>,
 ) -> Response {
     let user = current_user(&state, &headers);
-    let my_id = user
-        .as_ref()
-        .map(|u| u.id.clone())
-        .unwrap_or_else(|| "t1".to_string());
-    let my_business = user
-        .as_ref()
-        .map(|u| u.business_name.clone())
-        .unwrap_or_else(|| "Tienda La Esperanza".to_string());
+    let bid = if !payload.business_id.trim().is_empty() {
+        payload.business_id.trim().to_string()
+    } else if let Some(u) = &user {
+        u.id.clone()
+    } else {
+        "tienda_demo".to_string()
+    };
 
-    let orders = vec![
-        CollectiveOrderInput {
-            business_id: my_id,
-            business_name: my_business,
-            product_id: "prod_arroz_casanare".into(),
-            product_name: "Arroz Casanareño".into(),
-            quantity: 15.0,
-            unit: "bultos".into(),
-            retail_price_cop: 185_000.0,
-            wholesale_price_cop: 155_000.0,
-        },
-        CollectiveOrderInput {
-            business_id: "t2".into(),
-            business_name: "Agroinsumos Doña Martha".into(),
-            product_id: "prod_arroz_casanare".into(),
-            product_name: "Arroz Casanareño".into(),
-            quantity: 25.0,
-            unit: "bultos".into(),
-            retail_price_cop: 185_000.0,
-            wholesale_price_cop: 155_000.0,
-        },
-        CollectiveOrderInput {
-            business_id: "t3".into(),
-            business_name: "Minimarket El Llano".into(),
-            product_id: "prod_arroz_casanare".into(),
-            product_name: "Arroz Casanareño".into(),
-            quantity: 20.0,
-            unit: "bultos".into(),
-            retail_price_cop: 185_000.0,
-            wholesale_price_cop: 155_000.0,
-        },
-        CollectiveOrderInput {
-            business_id: "t4".into(),
-            business_name: "Comercializadora El Triunfo".into(),
-            product_id: "prod_arroz_casanare".into(),
-            product_name: "Arroz Casanareño".into(),
-            quantity: 10.0,
-            unit: "bultos".into(),
-            retail_price_cop: 185_000.0,
-            wholesale_price_cop: 155_000.0,
-        },
-    ];
+    let bname = if !payload.business_name.trim().is_empty() {
+        payload.business_name.trim().to_string()
+    } else if let Some(u) = &user {
+        u.business_name.clone()
+    } else {
+        "Tienda La Esperanza".to_string()
+    };
 
-    let summary = state.collective.aggregate_orders(&orders);
-    json_no_cache(StatusCode::OK, json!(summary))
+    let zone = if !payload.zone.trim().is_empty() {
+        payload.zone.trim().to_string()
+    } else if let Some(u) = &user {
+        u.zone.clone()
+    } else {
+        "Comuna 2, Yopal".to_string()
+    };
+
+    let pid = if payload.product_id.trim().is_empty() {
+        "prod_arroz_casanare"
+    } else {
+        payload.product_id.trim()
+    };
+    let pname = if payload.product_name.trim().is_empty() {
+        "Arroz Casanareño"
+    } else {
+        payload.product_name.trim()
+    };
+    let qty = payload.quantity.unwrap_or(10.0).max(1.0);
+    let unit = if payload.unit.trim().is_empty() {
+        "bultos"
+    } else {
+        payload.unit.trim()
+    };
+    let retail = payload.retail_price_cop.unwrap_or(185_000.0);
+    let wholesale = payload.wholesale_price_cop.unwrap_or(155_000.0);
+
+    if let Err(e) = state.ledger.add_collective_contribution(
+        &zone, &bid, &bname, pid, pname, qty, unit, retail, wholesale,
+    ) {
+        return json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        );
+    }
+
+    get_collective(State(state)).await
 }
 
 async fn reset_demo(State(state): State<Arc<AppState>>) -> Response {
@@ -715,5 +986,76 @@ mod tests {
             .unwrap()
             .iter()
             .all(|m| m["business_id"] == "tienda_demo"));
+    }
+
+    #[tokio::test]
+    async fn test_custom_products_nlp_and_persistent_collective() {
+        let state = AppState::open(":memory:").unwrap();
+        let app = build_router(state, None);
+
+        // Registrar tienda nueva
+        let (st, reg) = call_json(
+            &app,
+            "POST",
+            "/api/auth/register",
+            None,
+            Some(json!({
+                "phone": "3185554433",
+                "pin": "5555",
+                "owner_name": "Doña Elena",
+                "business_name": "Tienda El Moriche",
+                "zone": "Comuna 2, Yopal",
+                "habeas_data_accepted": true
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::CREATED);
+        let tok = reg["token"].as_str().unwrap();
+
+        // Crear producto personalizado "+ Nuevo producto"
+        let (st, created) = call_json(
+            &app,
+            "POST",
+            "/api/products",
+            Some(tok),
+            Some(json!({
+                "name": "Café Tostado Yopal",
+                "category": "Víveres",
+                "default_unit": "libras",
+                "min_threshold": 5,
+                "synonyms": ["cafe", "cafecito", "cafe tostado"]
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::CREATED);
+        assert_eq!(created["product"]["name"], "Café Tostado Yopal");
+
+        // Verificar que el NLP reconoce al instante el producto propio
+        let (st, parsed) = call_json(
+            &app,
+            "POST",
+            "/api/nlp/parse",
+            Some(tok),
+            Some(json!({ "phrase": "vendí cuatro libras de cafe tostado" })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(parsed.as_array().unwrap().len(), 1);
+        assert_eq!(parsed[0]["action"], "SALIDA");
+        assert_eq!(parsed[0]["quantity"], 4.0);
+        assert_eq!(parsed[0]["product_name"], "Café Tostado Yopal");
+
+        // Unirse de verdad al pedido colectivo persistente
+        let (st, col) = call_json(
+            &app,
+            "POST",
+            "/api/collective/join",
+            Some(tok),
+            Some(json!({ "quantity": 10.0 })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(col["participating_stores_count"], 5);
+        assert_eq!(col["products"][0]["total_quantity"], 80.0);
     }
 }

@@ -256,7 +256,11 @@ impl RegionalNlpParser {
         }
     }
 
-    pub fn find_best_product(&self, query: &str) -> Option<(&CatalogProduct, f64)> {
+    pub fn find_best_product<'a>(
+        &'a self,
+        query: &str,
+        extra_products: &'a [CatalogProduct],
+    ) -> Option<(&'a CatalogProduct, f64)> {
         let clean_query = normalize_text(query);
         if clean_query.len() < 2 {
             return None;
@@ -265,7 +269,7 @@ impl RegionalNlpParser {
         let mut best: Option<(&CatalogProduct, f64)> = None;
         let mut highest_score = 0.0;
 
-        for prod in &self.catalog.products {
+        for prod in self.catalog.products.iter().chain(extra_products.iter()) {
             let prod_name_clean = normalize_text(&prod.name);
             let mut sim = string_similarity(&clean_query, &prod_name_clean);
 
@@ -320,6 +324,14 @@ impl RegionalNlpParser {
     }
 
     pub fn parse_phrase(&self, raw_phrase: &str) -> Vec<ParsedEntity> {
+        self.parse_phrase_with_extra_products(raw_phrase, &[])
+    }
+
+    pub fn parse_phrase_with_extra_products(
+        &self,
+        raw_phrase: &str,
+        extra_products: &[CatalogProduct],
+    ) -> Vec<ParsedEntity> {
         let mut text_norm = normalize_text(raw_phrase);
         text_norm = self
             .article_action_re
@@ -405,7 +417,9 @@ impl RegionalNlpParser {
                 .collect::<Vec<_>>()
                 .join(" ");
 
-            if let Some((prod, score)) = self.find_best_product(&clean_product_query) {
+            if let Some((prod, score)) =
+                self.find_best_product(&clean_product_query, extra_products)
+            {
                 results.push(ParsedEntity {
                     raw_clause: clause,
                     action: action.to_string(),
