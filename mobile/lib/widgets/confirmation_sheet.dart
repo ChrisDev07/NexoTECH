@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/product_stock.dart';
 
+String _fmtQty(double v) => v % 1 == 0 ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
+
 Future<void> showOrigoConfirmationSheet({
   required BuildContext context,
   required ProductStock product,
@@ -21,6 +23,9 @@ Future<void> showOrigoConfirmationSheet({
     builder: (ctx) {
       return StatefulBuilder(
         builder: (context, setModalState) {
+          final double available = product.quantity;
+          final bool exceedsStock = currentIsSale && currentQty > available + 1e-6;
+
           return Padding(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 28),
             child: Column(
@@ -50,7 +55,10 @@ Future<void> showOrigoConfirmationSheet({
                   decoration: BoxDecoration(
                     color: const Color(0xFFFAF9F6),
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFE7E5E4), width: 2),
+                    border: Border.all(
+                      color: exceedsStock ? const Color(0xFFEF4444) : const Color(0xFFE7E5E4),
+                      width: 2,
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -79,11 +87,13 @@ Future<void> showOrigoConfirmationSheet({
                               ),
                             ),
                           ),
-                          const Text(
-                            '✨ 100% Entendido',
+                          Text(
+                            '📦 Stock: ${_fmtQty(available)} ${product.unit}',
                             style: TextStyle(
-                              color: Color(0xFF047857),
-                              fontWeight: FontWeight.w700,
+                              color: available <= 0
+                                  ? const Color(0xFFB91C1C)
+                                  : const Color(0xFF047857),
+                              fontWeight: FontWeight.w800,
                               fontSize: 13,
                             ),
                           ),
@@ -112,15 +122,23 @@ Future<void> showOrigoConfirmationSheet({
                                 minimumSize: const Size(48, 48),
                               ),
                               onPressed: () {
-                                if (currentQty > 0.5) {
+                                if (currentQty > 1) {
                                   setModalState(() => currentQty -= 1);
+                                } else if (currentQty > 0.5) {
+                                  setModalState(() => currentQty = 0.5);
                                 }
                               },
                               icon: const Icon(Icons.remove, size: 28),
                             ),
                             Text(
-                              '${currentQty.toStringAsFixed(currentQty % 1 == 0 ? 0 : 1)} ${product.unit}',
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
+                              '${_fmtQty(currentQty)} ${product.unit}',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: exceedsStock
+                                    ? const Color(0xFFB91C1C)
+                                    : const Color(0xFF1C1917),
+                              ),
                             ),
                             IconButton.filled(
                               style: IconButton.styleFrom(
@@ -134,6 +152,50 @@ Future<void> showOrigoConfirmationSheet({
                           ],
                         ),
                       ),
+                      if (exceedsStock) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEE2E2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                available <= 0
+                                    ? '⚠️ No tienes existencias de ${product.name} en bodega (0 ${product.unit}). Registra primero una entrada.'
+                                    : '⚠️ Stock insuficiente: solo tienes ${_fmtQty(available)} ${product.unit} disponibles y estás intentando vender ${_fmtQty(currentQty)} ${product.unit}.',
+                                style: const TextStyle(
+                                  color: Color(0xFF991B1B),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              if (available > 0) ...[
+                                const SizedBox(height: 8),
+                                OutlinedButton(
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF991B1B),
+                                    side: const BorderSide(color: Color(0xFFDC2626)),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                  ),
+                                  onPressed: () => setModalState(() => currentQty = available),
+                                  child: Text(
+                                    'Ajustar a ${_fmtQty(available)} ${product.unit} (disponible)',
+                                    style: const TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -143,16 +205,21 @@ Future<void> showOrigoConfirmationSheet({
                   child: FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF047857),
+                      disabledBackgroundColor: const Color(0xFFD6D3D1),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
-                    onPressed: () {
-                      onConfirm(currentIsSale, currentQty);
-                      Navigator.pop(ctx);
-                    },
-                    child: const Text(
-                      '✔ Sí, es correcto (Guardar)',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                    onPressed: exceedsStock
+                        ? null
+                        : () {
+                            onConfirm(currentIsSale, currentQty);
+                            Navigator.pop(ctx);
+                          },
+                    child: Text(
+                      exceedsStock
+                          ? '⛔ Stock insuficiente para vender'
+                          : '✔ Sí, es correcto (Guardar)',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                     ),
                   ),
                 ),

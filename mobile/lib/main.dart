@@ -466,6 +466,14 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
       initialIsSale: isSale,
       initialQty: qty,
       onConfirm: (confirmedSale, confirmedQty) async {
+        // 0. Validación defensiva: nunca permitir salidas mayores al inventario disponible
+        if (confirmedSale && confirmedQty > product.quantity + 1e-6) {
+          _showSnack(
+            '⚠️ Stock insuficiente para ${product.name}: solo tienes ${product.quantity.toStringAsFixed(product.quantity % 1 == 0 ? 0 : 1)} ${product.unit} disponibles.',
+          );
+          return;
+        }
+
         // 1. Guardar siempre primero en SQLite aislado por `user.id`
         await _ledger.recordMovement(
           businessId: user.id,
