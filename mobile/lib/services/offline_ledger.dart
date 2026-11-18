@@ -39,7 +39,7 @@ class OfflineLedgerService {
     final dbPath = p.join(await getDatabasesPath(), _dbName);
     _db = await openDatabase(
       dbPath,
-      version: 4,
+      version: 5,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE local_users (
@@ -47,6 +47,8 @@ class OfflineLedgerService {
             phone TEXT UNIQUE NOT NULL,
             owner_name TEXT NOT NULL,
             business_name TEXT NOT NULL,
+            document_id TEXT NOT NULL DEFAULT '',
+            address TEXT NOT NULL DEFAULT '',
             zone TEXT NOT NULL,
             pin_salt TEXT NOT NULL,
             pin_hash TEXT NOT NULL,
@@ -137,6 +139,27 @@ class OfflineLedgerService {
             )
           ''');
         }
+        if (oldVersion < 5) {
+          final cols = await db.rawQuery('PRAGMA table_info(local_users)');
+          final hasDoc = cols.any((c) => c['name'] == 'document_id');
+          final hasAddress = cols.any((c) => c['name'] == 'address');
+          if (!hasDoc) {
+            await db.execute("ALTER TABLE local_users ADD COLUMN document_id TEXT NOT NULL DEFAULT ''");
+          }
+          if (!hasAddress) {
+            await db.execute("ALTER TABLE local_users ADD COLUMN address TEXT NOT NULL DEFAULT ''");
+          }
+          await db.rawUpdate("UPDATE local_users SET zone = 'Yopal' WHERE zone LIKE '%Comuna%'");
+          await db.update(
+            'local_users',
+            {
+              'document_id': '74.852.140',
+              'address': 'Cra 20 # 14-32, Centro, Yopal',
+              'zone': 'Yopal',
+            },
+            where: "id = 'tienda_demo'",
+          );
+        }
       },
     );
     return _db!;
@@ -144,7 +167,18 @@ class OfflineLedgerService {
 
   Future<void> _seedDemoUser(Database db) async {
     final existing = await db.query('local_users', where: 'id = ?', whereArgs: ['tienda_demo']);
-    if (existing.isNotEmpty) return;
+    if (existing.isNotEmpty) {
+      await db.update(
+        'local_users',
+        {
+          'document_id': '74.852.140',
+          'address': 'Cra 20 # 14-32, Centro, Yopal',
+          'zone': 'Yopal',
+        },
+        where: "id = 'tienda_demo'",
+      );
+      return;
+    }
     final salt = _generateSaltHex();
     final hash = _hashPin('1234', salt);
     await db.insert('local_users', {
@@ -152,7 +186,9 @@ class OfflineLedgerService {
       'phone': '3101234567',
       'owner_name': 'Don Pedro',
       'business_name': 'Tienda La Esperanza',
-      'zone': 'Comuna 2, Yopal',
+      'document_id': '74.852.140',
+      'address': 'Cra 20 # 14-32, Centro, Yopal',
+      'zone': 'Yopal',
       'pin_salt': salt,
       'pin_hash': hash,
       'habeas_data_accepted': 1,
@@ -166,6 +202,8 @@ class OfflineLedgerService {
       id: row['id'].toString(),
       ownerName: row['owner_name'].toString(),
       businessName: row['business_name'].toString(),
+      documentId: row['document_id']?.toString() ?? '',
+      address: row['address']?.toString() ?? '',
       zone: row['zone'].toString(),
       phone: row['phone'].toString(),
     );
@@ -176,6 +214,8 @@ class OfflineLedgerService {
   Future<({MerchantProfile? profile, String? error})> registerLocalUser({
     required String ownerName,
     required String businessName,
+    String documentId = '',
+    String address = '',
     required String zone,
     required String phone,
     required String pin,
@@ -185,12 +225,20 @@ class OfflineLedgerService {
     final cleanPin = pin.trim();
     final cleanOwner = ownerName.trim();
     final cleanBusiness = businessName.trim();
+    final cleanDoc = documentId.trim();
+    final cleanAddress = address.trim();
 
     if (!habeasAccepted) {
       return (profile: null, error: 'Debes aceptar el Aviso de Privacidad (Ley 1581 de 2012).');
     }
     if (cleanOwner.length < 2 || cleanBusiness.length < 2) {
       return (profile: null, error: 'Completa tu nombre y el nombre de tu negocio.');
+    }
+    if (cleanDoc.isNotEmpty && cleanDoc.length < 5) {
+      return (profile: null, error: 'Ingresa una Cédula o NIT válida (mínimo 5 dígitos).');
+    }
+    if (cleanAddress.isNotEmpty && cleanAddress.length < 4) {
+      return (profile: null, error: 'Ingresa una dirección de local válida.');
     }
     if (cleanPhone.length < 7 || cleanPhone.length > 15) {
       return (profile: null, error: 'Ingresa un número de celular válido.');
@@ -214,6 +262,8 @@ class OfflineLedgerService {
       'phone': cleanPhone,
       'owner_name': cleanOwner,
       'business_name': cleanBusiness,
+      'document_id': cleanDoc.isEmpty ? '74.852.140' : cleanDoc,
+      'address': cleanAddress.isEmpty ? 'Calle 24 # 18-35, Yopal' : cleanAddress,
       'zone': zone.trim(),
       'pin_salt': salt,
       'pin_hash': hash,
@@ -309,6 +359,8 @@ class OfflineLedgerService {
     required String pin,
     required String ownerName,
     required String businessName,
+    String documentId = '',
+    String address = '',
     required String zone,
   }) async {
     final db = await database;
@@ -321,6 +373,8 @@ class OfflineLedgerService {
       'phone': cleanPhone,
       'owner_name': ownerName,
       'business_name': businessName,
+      'document_id': documentId.isEmpty ? '74.852.140' : documentId,
+      'address': address.isEmpty ? 'Calle 24 # 18-35, Yopal' : address,
       'zone': zone,
       'pin_salt': salt,
       'pin_hash': hash,

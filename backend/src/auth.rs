@@ -107,6 +107,8 @@ impl AuthManager {
                 phone TEXT UNIQUE NOT NULL,
                 owner_name TEXT NOT NULL,
                 business_name TEXT NOT NULL,
+                document_id TEXT NOT NULL DEFAULT '',
+                address TEXT NOT NULL DEFAULT '',
                 zone TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'comerciante',
                 pin_salt TEXT NOT NULL,
@@ -123,7 +125,22 @@ impl AuthManager {
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
             ",
-        )
+        )?;
+
+        // Migración preventiva para bases de datos existentes
+        let mut stmt = conn.prepare("PRAGMA table_info(users)")?;
+        let cols: Vec<String> = stmt
+            .query_map([], |r| r.get(1))?
+            .filter_map(|r| r.ok())
+            .collect();
+        if !cols.iter().any(|c| c == "document_id") {
+            let _ = conn.execute("ALTER TABLE users ADD COLUMN document_id TEXT NOT NULL DEFAULT ''", []);
+        }
+        if !cols.iter().any(|c| c == "address") {
+            let _ = conn.execute("ALTER TABLE users ADD COLUMN address TEXT NOT NULL DEFAULT ''", []);
+        }
+
+        Ok(())
     }
 
     pub fn seed_demo_account(&self) -> rusqlite::Result<()> {
@@ -136,21 +153,28 @@ impl AuthManager {
             )
             .optional()?;
         if exists.is_some() {
+            let _ = conn.execute(
+                "UPDATE users SET document_id = '74.852.140', address = 'Cra 20 # 14-32, Centro, Yopal', zone = 'Yopal'
+                 WHERE id = 'tienda_demo'",
+                [],
+            );
             return Ok(());
         }
         let (salt_hex, hash_hex) = hash_pin("1234", None);
         let now = now_unix_secs();
         conn.execute(
             "INSERT INTO users
-            (id, phone, owner_name, business_name, zone, role, pin_salt, pin_hash,
+            (id, phone, owner_name, business_name, document_id, address, zone, role, pin_salt, pin_hash,
              habeas_data_accepted, habeas_data_timestamp, created_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 "tienda_demo",
                 "3101234567",
                 "Don Pedro",
                 "Tienda La Esperanza",
-                "Comuna 2, Yopal",
+                "74.852.140",
+                "Cra 20 # 14-32, Centro, Yopal",
+                "Yopal",
                 "comerciante",
                 salt_hex,
                 hash_hex,
@@ -178,6 +202,8 @@ impl AuthManager {
         pin: &str,
         owner_name: &str,
         business_name: &str,
+        document_id: Option<&str>,
+        address: Option<&str>,
         zone: &str,
         habeas_data_accepted: bool,
     ) -> Result<AuthResponse, String> {
@@ -185,8 +211,10 @@ impl AuthManager {
         let clean_pin = pin.trim();
         let clean_owner = owner_name.trim();
         let clean_business = business_name.trim();
-        let clean_zone = if zone.trim().is_empty() {
-            "Comuna 2, Yopal"
+        let clean_doc = document_id.unwrap_or("").trim();
+        let clean_address = address.unwrap_or("").trim();
+        let clean_zone = if zone.trim().is_empty() || zone.trim().contains("Comuna") {
+            "Yopal"
         } else {
             zone.trim()
         };
@@ -231,14 +259,16 @@ impl AuthManager {
 
         conn.execute(
             "INSERT INTO users
-            (id, phone, owner_name, business_name, zone, role, pin_salt, pin_hash,
+            (id, phone, owner_name, business_name, document_id, address, zone, role, pin_salt, pin_hash,
              habeas_data_accepted, habeas_data_timestamp, created_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 user_id,
                 clean_phone,
                 clean_owner,
                 clean_business,
+                clean_doc,
+                clean_address,
                 clean_zone,
                 "comerciante",
                 salt_hex,
@@ -258,6 +288,8 @@ impl AuthManager {
                 phone: clean_phone,
                 owner_name: clean_owner.to_string(),
                 business_name: clean_business.to_string(),
+                document_id: clean_doc.to_string(),
+                address: clean_address.to_string(),
                 zone: clean_zone.to_string(),
                 role: "comerciante".to_string(),
                 habeas_data_accepted: true,
@@ -275,23 +307,25 @@ impl AuthManager {
         let conn = self.conn.lock().unwrap();
         let row: Option<(PublicUser, String, String)> = conn
             .query_row(
-                "SELECT id, phone, owner_name, business_name, zone, role, habeas_data_accepted, pin_salt, pin_hash
+                "SELECT id, phone, owner_name, business_name, document_id, address, zone, role, habeas_data_accepted, pin_salt, pin_hash
                  FROM users WHERE phone = ?1",
                 params![clean_phone],
                 |r| {
-                    let habeas: i64 = r.get(6)?;
+                    let habeas: i64 = r.get(8)?;
                     Ok((
                         PublicUser {
                             id: r.get(0)?,
                             phone: r.get(1)?,
                             owner_name: r.get(2)?,
                             business_name: r.get(3)?,
-                            zone: r.get(4)?,
-                            role: r.get(5)?,
+                            document_id: r.get(4)?,
+                            address: r.get(5)?,
+                            zone: r.get(6)?,
+                            role: r.get(7)?,
                             habeas_data_accepted: habeas != 0,
                         },
-                        r.get::<_, String>(7)?,
-                        r.get::<_, String>(8)?,
+                        r.get::<_, String>(9)?,
+                        r.get::<_, String>(10)?,
                     ))
                 },
             )
@@ -321,24 +355,26 @@ impl AuthManager {
         let conn = self.conn.lock().unwrap();
         let row: Option<(PublicUser, f64)> = conn
             .query_row(
-                "SELECT u.id, u.phone, u.owner_name, u.business_name, u.zone, u.role, u.habeas_data_accepted, s.expires_at
+                "SELECT u.id, u.phone, u.owner_name, u.business_name, u.document_id, u.address, u.zone, u.role, u.habeas_data_accepted, s.expires_at
                  FROM sessions s
                  JOIN users u ON u.id = s.user_id
                  WHERE s.token = ?1",
                 params![tok],
                 |r| {
-                    let habeas: i64 = r.get(6)?;
+                    let habeas: i64 = r.get(8)?;
                     Ok((
                         PublicUser {
                             id: r.get(0)?,
                             phone: r.get(1)?,
                             owner_name: r.get(2)?,
                             business_name: r.get(3)?,
-                            zone: r.get(4)?,
-                            role: r.get(5)?,
+                            document_id: r.get(4)?,
+                            address: r.get(5)?,
+                            zone: r.get(6)?,
+                            role: r.get(7)?,
                             habeas_data_accepted: habeas != 0,
                         },
-                        r.get::<_, f64>(7)?,
+                        r.get::<_, f64>(9)?,
                     ))
                 },
             )
@@ -367,6 +403,8 @@ impl AuthManager {
         phone: &str,
         owner_name: &str,
         business_name: &str,
+        document_id: Option<&str>,
+        address: Option<&str>,
         zone: &str,
         pin_salt: &str,
         pin_hash: &str,
@@ -392,22 +430,26 @@ impl AuthManager {
             return Ok((ex_id, "already_exists"));
         }
 
-        let clean_zone = if zone.trim().is_empty() {
-            "Comuna 2, Yopal"
+        let clean_zone = if zone.trim().is_empty() || zone.trim().contains("Comuna") {
+            "Yopal"
         } else {
             zone.trim()
         };
+        let clean_doc = document_id.unwrap_or("").trim();
+        let clean_address = address.unwrap_or("").trim();
 
         conn.execute(
             "INSERT INTO users
-            (id, phone, owner_name, business_name, zone, role, pin_salt, pin_hash,
+            (id, phone, owner_name, business_name, document_id, address, zone, role, pin_salt, pin_hash,
              habeas_data_accepted, habeas_data_timestamp, created_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 user_id,
                 clean_phone,
                 owner_name.trim(),
                 business_name.trim(),
+                clean_doc,
+                clean_address,
                 clean_zone,
                 "comerciante",
                 pin_salt,
@@ -443,6 +485,8 @@ mod tests {
             "5678",
             "Doña Martha",
             "Agroinsumos Aguazul",
+            Some("47.123.456"),
+            Some("Calle 10 # 5-20"),
             "Centro, Aguazul",
             false,
         );
@@ -459,15 +503,20 @@ mod tests {
                 "5678",
                 "Doña Martha",
                 "Agroinsumos Aguazul",
+                Some("47.123.456"),
+                Some("Calle 10 # 5-20"),
                 "Centro, Aguazul",
                 true,
             )
             .unwrap();
         assert_eq!(res.user.owner_name, "Doña Martha");
         assert_eq!(res.user.phone, "3209998877");
+        assert_eq!(res.user.document_id, "47.123.456");
+        assert_eq!(res.user.address, "Calle 10 # 5-20");
 
         let session_user = auth.get_session_user(Some(&res.token)).unwrap();
         assert_eq!(session_user.id, res.user.id);
+        assert_eq!(session_user.document_id, "47.123.456");
 
         assert!(auth.login("3209998877", "5678").is_ok());
         assert!(auth.login("3209998877", "9999").is_err());
@@ -482,6 +531,8 @@ mod tests {
         let demo = auth.login("3101234567", "1234").unwrap();
         assert_eq!(demo.user.id, "tienda_demo");
         assert_eq!(demo.user.owner_name, "Don Pedro");
+        assert_eq!(demo.user.document_id, "74.852.140");
+        assert_eq!(demo.user.address, "Cra 20 # 14-32, Centro, Yopal");
 
         let salt = "0123456789abcdef0123456789abcdef";
         let mobile_hash = hash_pin_mobile_sha256("4321", salt);
@@ -492,6 +543,8 @@ mod tests {
                 "3158887766",
                 "Doña Rosa",
                 "Granero El Morichal",
+                Some("52.987.654"),
+                Some("Cra 15 # 8-12, Yopal"),
                 "Centro, Yopal",
                 salt,
                 &mobile_hash,
@@ -507,6 +560,8 @@ mod tests {
                 "3158887766",
                 "Doña Rosa",
                 "Granero El Morichal",
+                Some("52.987.654"),
+                Some("Cra 15 # 8-12, Yopal"),
                 "Centro, Yopal",
                 salt,
                 &mobile_hash,
@@ -519,5 +574,7 @@ mod tests {
         let web_login = auth.login("3158887766", "4321").unwrap();
         assert_eq!(web_login.user.id, "tienda_offline_1");
         assert_eq!(web_login.user.business_name, "Granero El Morichal");
+        assert_eq!(web_login.user.document_id, "52.987.654");
+        assert_eq!(web_login.user.address, "Cra 15 # 8-12, Yopal");
     }
 }

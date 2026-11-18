@@ -117,6 +117,8 @@ class AutoSyncService {
           pin: pin,
           ownerName: u['owner_name'].toString(),
           businessName: u['business_name'].toString(),
+          documentId: u['document_id']?.toString() ?? '',
+          address: u['address']?.toString() ?? '',
           zone: u['zone'].toString(),
         );
 
@@ -314,9 +316,12 @@ class AutoSyncService {
     return null;
   }
 
-  /// Suma un pedido real de la tienda actual a la compra colectiva del servidor Rust.
+  /// Suma o propone un pedido real de la tienda actual en el tablón comunitario del servidor Rust.
   Future<Map<String, dynamic>?> joinCollectiveOrder({
     required MerchantProfile user,
+    String productId = 'prod_arroz_casanare',
+    String productName = 'Arroz Casanareño',
+    String unit = 'bultos',
     double quantity = 10.0,
   }) async {
     final online = await checkOnlineNow();
@@ -331,10 +336,10 @@ class AutoSyncService {
               'business_id': user.id,
               'business_name': user.businessName,
               'zone': user.zone,
-              'product_id': 'prod_arroz_casanare',
-              'product_name': 'Arroz Casanareño',
+              'product_id': productId,
+              'product_name': productName,
               'quantity': quantity,
-              'unit': 'bultos',
+              'unit': unit,
             }),
           )
           .timeout(const Duration(seconds: 5));

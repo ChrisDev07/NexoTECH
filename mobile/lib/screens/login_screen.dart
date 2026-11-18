@@ -23,24 +23,38 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isRegister = false;
   bool _habeasAccepted = false;
   bool _busy = false;
-  String _selectedZone = 'Comuna 2, Yopal';
+  String _selectedZone = 'Yopal';
   String? _errorText;
 
   final _phoneCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
   final _ownerCtrl = TextEditingController();
   final _businessCtrl = TextEditingController();
+  final _documentCtrl = TextEditingController();
+  final _addressCtrl = TextEditingController();
 
   final List<String> _zones = const [
-    'Comuna 2, Yopal',
-    'Comuna 5, Yopal',
-    'Centro, Aguazul',
+    'Yopal',
+    'Aguazul',
     'Villanueva',
     'Tauramena',
     'Maní',
     'Paz de Ariporo',
     'Monterrey',
+    'Pore',
+    'Trinidad',
   ];
+
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    _pinCtrl.dispose();
+    _ownerCtrl.dispose();
+    _businessCtrl.dispose();
+    _documentCtrl.dispose();
+    _addressCtrl.dispose();
+    super.dispose();
+  }
 
   void _showPrivacyDialog() {
     showDialog(
@@ -90,6 +104,8 @@ class _LoginScreenState extends State<LoginScreen> {
         final res = await widget.ledger.registerLocalUser(
           ownerName: _ownerCtrl.text,
           businessName: _businessCtrl.text,
+          documentId: _documentCtrl.text,
+          address: _addressCtrl.text,
           zone: _selectedZone,
           phone: _phoneCtrl.text,
           pin: _pinCtrl.text,
@@ -218,17 +234,39 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (_isRegister) ...[
                       TextField(
                         controller: _ownerCtrl,
-                        decoration: const InputDecoration(labelText: '👤 Tu nombre'),
+                        decoration: const InputDecoration(
+                          labelText: '👤 Nombre del comerciante',
+                          hintText: 'Ej. Don Pedro',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _documentCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '🪪 Cédula de Ciudadanía / NIT',
+                          hintText: 'Ej. 74.852.140',
+                        ),
                       ),
                       const SizedBox(height: 10),
                       TextField(
                         controller: _businessCtrl,
-                        decoration: const InputDecoration(labelText: '🏪 Nombre de tu negocio'),
+                        decoration: const InputDecoration(
+                          labelText: '🏪 Nombre de tu negocio',
+                          hintText: 'Ej. Tienda La Esperanza',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _addressCtrl,
+                        decoration: const InputDecoration(
+                          labelText: '📍 Dirección exacta del local',
+                          hintText: 'Ej. Calle 24 # 18-35, Yopal',
+                        ),
                       ),
                       const SizedBox(height: 10),
                       DropdownButtonFormField<String>(
                         initialValue: _selectedZone,
-                        decoration: const InputDecoration(labelText: '📍 Zona en Casanare'),
+                        decoration: const InputDecoration(labelText: '📍 Municipio (Casanare)'),
                         items: _zones
                             .map((z) => DropdownMenuItem(value: z, child: Text(z)))
                             .toList(),

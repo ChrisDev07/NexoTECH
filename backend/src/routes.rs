@@ -150,6 +150,10 @@ struct RegisterPayload {
     #[serde(default)]
     business_name: String,
     #[serde(default)]
+    document_id: String,
+    #[serde(default)]
+    address: String,
+    #[serde(default)]
     zone: String,
     #[serde(default)]
     habeas_data_accepted: Value,
@@ -165,6 +169,8 @@ async fn auth_register(
         &payload.pin,
         &payload.owner_name,
         &payload.business_name,
+        if payload.document_id.trim().is_empty() { None } else { Some(&payload.document_id) },
+        if payload.address.trim().is_empty() { None } else { Some(&payload.address) },
         &payload.zone,
         accepted,
     ) {
@@ -612,7 +618,9 @@ async fn sync_users(
         let zone = u
             .get("zone")
             .and_then(Value::as_str)
-            .unwrap_or("Comuna 2, Yopal");
+            .unwrap_or("Yopal");
+        let document_id = u.get("document_id").and_then(Value::as_str);
+        let address = u.get("address").and_then(Value::as_str);
         let pin_salt = u.get("pin_salt").and_then(Value::as_str).unwrap_or("");
         let pin_hash = u.get("pin_hash").and_then(Value::as_str).unwrap_or("");
         let habeas = value_as_bool(u.get("habeas_data_accepted"), true);
@@ -623,6 +631,8 @@ async fn sync_users(
             phone,
             owner_name,
             business_name,
+            document_id,
+            address,
             zone,
             pin_salt,
             pin_hash,
@@ -847,30 +857,49 @@ async fn join_collective(
     } else if let Some(u) = &user {
         u.zone.clone()
     } else {
-        "Comuna 2, Yopal".to_string()
+        "Yopal".to_string()
     };
 
     let pid = if payload.product_id.trim().is_empty() {
-        "prod_arroz_casanare"
+        "prod_arroz_casanare".to_string()
     } else {
-        payload.product_id.trim()
+        payload.product_id.trim().to_string()
     };
     let pname = if payload.product_name.trim().is_empty() {
-        "Arroz Casanareño"
+        let cat_prod = state.parser.catalog.products.iter().find(|p| p.id == pid);
+        cat_prod
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| "Producto Casanareño".to_string())
     } else {
-        payload.product_name.trim()
+        payload.product_name.trim().to_string()
     };
-    let qty = payload.quantity.unwrap_or(10.0).max(1.0);
     let unit = if payload.unit.trim().is_empty() {
-        "bultos"
+        let cat_prod = state.parser.catalog.products.iter().find(|p| p.id == pid);
+        cat_prod
+            .map(|p| p.default_unit.clone())
+            .unwrap_or_else(|| "bultos".to_string())
     } else {
-        payload.unit.trim()
+        payload.unit.trim().to_string()
     };
-    let retail = payload.retail_price_cop.unwrap_or(185_000.0);
-    let wholesale = payload.wholesale_price_cop.unwrap_or(155_000.0);
+
+    let cat_prod = state.parser.catalog.products.iter().find(|p| p.id == pid);
+    let default_retail = cat_prod.map(|p| p.retail_price_cop).unwrap_or(185_000.0);
+    let default_wholesale = cat_prod
+        .map(|p| p.wholesale_price_cop)
+        .unwrap_or(default_retail * 0.82);
+
+    let retail = payload
+        .retail_price_cop
+        .filter(|v| *v > 0.0)
+        .unwrap_or(default_retail);
+    let wholesale = payload
+        .wholesale_price_cop
+        .filter(|v| *v > 0.0)
+        .unwrap_or(default_wholesale);
+    let qty = payload.quantity.unwrap_or(10.0).max(0.5);
 
     if let Err(e) = state.ledger.add_collective_contribution(
-        &zone, &bid, &bname, pid, pname, qty, unit, retail, wholesale,
+        &zone, &bid, &bname, &pid, &pname, qty, &unit, retail, wholesale,
     ) {
         return json_no_cache(
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -1042,7 +1071,7 @@ mod tests {
                 "pin": "5555",
                 "owner_name": "Doña Elena",
                 "business_name": "Tienda El Moriche",
-                "zone": "Comuna 2, Yopal",
+                "zone": "Yopal",
                 "habeas_data_accepted": true
             })),
         )
@@ -1093,7 +1122,8 @@ mod tests {
         )
         .await;
         assert_eq!(st, StatusCode::OK);
-        assert_eq!(col["participating_stores_count"], 5);
+        assert_eq!(col["participating_stores_count"], 8);
+        assert_eq!(col["products"][0]["stores_count"], 5);
         assert_eq!(col["products"][0]["total_quantity"], 80.0);
     }
 

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 class OrigoHeader extends StatelessWidget {
   final String ownerName;
   final String storeLocation;
+  final String documentId;
+  final String address;
   final VoidCallback? onConfigureServer;
   final VoidCallback? onLogout;
 
@@ -10,6 +12,8 @@ class OrigoHeader extends StatelessWidget {
     super.key,
     required this.ownerName,
     required this.storeLocation,
+    this.documentId = '',
+    this.address = '',
     this.onConfigureServer,
     this.onLogout,
   });
@@ -76,9 +80,18 @@ class OrigoHeader extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '📍 $storeLocation',
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 14),
+            '🏪 $storeLocation',
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.95), fontSize: 14, fontWeight: FontWeight.w600),
           ),
+          if (documentId.isNotEmpty || address.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              '${documentId.isNotEmpty ? "🪪 CC/NIT: $documentId" : ""}${documentId.isNotEmpty && address.isNotEmpty ? " · " : ""}${address.isNotEmpty ? "📍 $address" : ""}',
+              style: TextStyle(color: Colors.white.withValues(alpha: 0.82), fontSize: 12),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ],
       ),
     );

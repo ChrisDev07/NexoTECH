@@ -159,6 +159,10 @@ pub struct PublicUser {
     pub phone: String,
     pub owner_name: String,
     pub business_name: String,
+    #[serde(default)]
+    pub document_id: String,
+    #[serde(default)]
+    pub address: String,
     pub zone: String,
     pub role: String,
     pub habeas_data_accepted: bool,
