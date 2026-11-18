@@ -3,6 +3,7 @@ import '../models/movement_log.dart';
 
 class HomeScreen extends StatelessWidget {
   final bool isListening;
+  final String liveTranscript;
   final int lowStockCount;
   final bool isHistoryExpanded;
   final List<MovementLog> recentMovements;
@@ -13,6 +14,7 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({
     super.key,
     required this.isListening,
+    this.liveTranscript = '',
     required this.lowStockCount,
     required this.isHistoryExpanded,
     required this.recentMovements,
@@ -63,13 +65,25 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 14),
               Text(
-                isListening ? '🔴 Escuchando... Toca al terminar' : 'Presiona para hablar',
+                isListening ? '🔴 Escuchando... Habla ahora' : 'Presiona para hablar',
                 style: TextStyle(
                   fontWeight: FontWeight.w800,
                   fontSize: 16,
                   color: isListening ? Colors.red : const Color(0xFF047857),
                 ),
               ),
+              if (liveTranscript.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '"$liveTranscript"',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xFF57534E),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
