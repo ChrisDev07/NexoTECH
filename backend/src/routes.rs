@@ -1,0 +1,719 @@
+//! Rutas HTTP REST y servidor de archivos estáticos de Origo en Rust (Axum).
+//! Mantiene 100% compatibilidad con la app móvil Flutter y la interfaz web existente.
+
+use crate::auth::{privacy_policy_ley_1581, AuthManager};
+use crate::collective::{CollectiveOrderInput, CollectivePurchasingEngine};
+use crate::ledger::LocalLedger;
+use crate::models::{now_unix_secs, Movement, PublicUser};
+use crate::nlp::RegionalNlpParser;
+use axum::extract::State;
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::response::{IntoResponse, Response};
+use axum::routing::{get, post};
+use axum::{Json, Router};
+use serde::Deserialize;
+use serde_json::{json, Value};
+use std::path::PathBuf;
+use std::sync::Arc;
+use tower_http::cors::CorsLayer;
+use tower_http::services::{ServeDir, ServeFile};
+
+pub struct AppState {
+    pub parser: RegionalNlpParser,
+    pub ledger: LocalLedger,
+    pub auth: AuthManager,
+    pub collective: CollectivePurchasingEngine,
+}
+
+impl AppState {
+    pub fn open(db_path: &str) -> rusqlite::Result<Arc<Self>> {
+        let parser = RegionalNlpParser::from_embedded();
+        let ledger = LocalLedger::open(db_path)?;
+        let auth = AuthManager::open(db_path)?;
+        ledger.seed_demo_data(false)?;
+        let collective = CollectivePurchasingEngine::new(120_000.0);
+        Ok(Arc::new(Self {
+            parser,
+            ledger,
+            auth,
+            collective,
+        }))
+    }
+}
+
+pub fn build_router(state: Arc<AppState>, static_dir: Option<PathBuf>) -> Router {
+    let mut router = Router::new()
+        .route("/api/health", get(health_check))
+        .route("/api/privacy", get(get_privacy))
+        .route("/api/auth/me", get(auth_me))
+        .route("/api/auth/register", post(auth_register))
+        .route("/api/auth/login", post(auth_login))
+        .route("/api/auth/logout", post(auth_logout))
+        .route("/api/catalog", get(get_catalog))
+        .route("/api/nlp/parse", post(nlp_parse))
+        .route("/api/stock", get(get_stock))
+        .route("/api/stock/daily", get(get_daily_stock))
+        .route("/api/movements", get(get_movements).post(post_movements))
+        .route("/api/sync/users", post(sync_users))
+        .route("/api/sync/movements", post(sync_movements))
+        .route("/api/sync", post(sync_local))
+        .route("/api/collective/simulate", post(collective_simulate))
+        .route("/api/reset", post(reset_demo))
+        .with_state(state)
+        .layer(CorsLayer::permissive());
+
+    if let Some(dir) = static_dir {
+        if dir.is_dir() {
+            let index_path = dir.join("index.html");
+            router = router
+                .route_service("/", ServeFile::new(index_path.clone()))
+                .route_service("/index.html", ServeFile::new(index_path))
+                .nest_service("/css", ServeDir::new(dir.join("css")))
+                .nest_service("/js", ServeDir::new(dir.join("js")));
+        }
+    }
+
+    router
+}
+
+fn json_no_cache(status: StatusCode, body: Value) -> Response {
+    let mut resp = (status, Json(body)).into_response();
+    resp.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store, no-cache, must-revalidate, max-age=0"),
+    );
+    resp
+}
+
+fn extract_bearer(headers: &HeaderMap) -> Option<&str> {
+    let auth = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+    auth.strip_prefix("Bearer ").map(str::trim)
+}
+
+fn current_user(state: &AppState, headers: &HeaderMap) -> Option<PublicUser> {
+    state.auth.get_session_user(extract_bearer(headers))
+}
+
+fn resolve_business_id(state: &AppState, headers: &HeaderMap) -> String {
+    current_user(state, headers)
+        .map(|u| u.id)
+        .unwrap_or_else(|| "tienda_demo".to_string())
+}
+
+fn value_as_bool(v: Option<&Value>, default: bool) -> bool {
+    match v {
+        Some(Value::Bool(b)) => *b,
+        Some(Value::Number(n)) => n.as_i64().unwrap_or(0) != 0,
+        Some(Value::String(s)) => matches!(s.to_lowercase().as_str(), "true" | "1" | "yes"),
+        _ => default,
+    }
+}
+
+async fn health_check() -> Response {
+    json_no_cache(
+        StatusCode::OK,
+        json!({
+            "status": "ok",
+            "engine": "rust-axum",
+            "service": "origo-backend",
+            "version": env!("CARGO_PKG_VERSION")
+        }),
+    )
+}
+
+async fn get_privacy() -> Response {
+    json_no_cache(StatusCode::OK, json!(privacy_policy_ley_1581()))
+}
+
+async fn auth_me(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    match current_user(&state, &headers) {
+        Some(user) => json_no_cache(StatusCode::OK, json!({ "user": user })),
+        None => json_no_cache(
+            StatusCode::UNAUTHORIZED,
+            json!({ "error": "Sesión no iniciada" }),
+        ),
+    }
+}
+
+#[derive(Deserialize, Default)]
+struct RegisterPayload {
+    #[serde(default)]
+    phone: String,
+    #[serde(default)]
+    pin: String,
+    #[serde(default)]
+    owner_name: String,
+    #[serde(default)]
+    business_name: String,
+    #[serde(default)]
+    zone: String,
+    #[serde(default)]
+    habeas_data_accepted: Value,
+}
+
+async fn auth_register(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<RegisterPayload>,
+) -> Response {
+    let accepted = value_as_bool(Some(&payload.habeas_data_accepted), false);
+    match state.auth.register_user(
+        &payload.phone,
+        &payload.pin,
+        &payload.owner_name,
+        &payload.business_name,
+        &payload.zone,
+        accepted,
+    ) {
+        Ok(res) => json_no_cache(StatusCode::CREATED, json!(res)),
+        Err(err) => json_no_cache(StatusCode::BAD_REQUEST, json!({ "error": err })),
+    }
+}
+
+#[derive(Deserialize, Default)]
+struct LoginPayload {
+    #[serde(default)]
+    phone: String,
+    #[serde(default)]
+    pin: String,
+}
+
+async fn auth_login(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<LoginPayload>,
+) -> Response {
+    match state.auth.login(&payload.phone, &payload.pin) {
+        Ok(res) => json_no_cache(StatusCode::OK, json!(res)),
+        Err(err) => json_no_cache(StatusCode::UNAUTHORIZED, json!({ "error": err })),
+    }
+}
+
+async fn auth_logout(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    state.auth.logout(extract_bearer(&headers));
+    json_no_cache(StatusCode::OK, json!({ "status": "ok" }))
+}
+
+async fn get_catalog(State(state): State<Arc<AppState>>) -> Response {
+    json_no_cache(StatusCode::OK, json!(state.parser.catalog))
+}
+
+#[derive(Deserialize, Default)]
+struct NlpPayload {
+    #[serde(default)]
+    phrase: String,
+}
+
+async fn nlp_parse(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<NlpPayload>,
+) -> Response {
+    let items = state.parser.parse_phrase(&payload.phrase);
+    json_no_cache(StatusCode::OK, json!(items))
+}
+
+async fn get_stock(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let business_id = resolve_business_id(&state, &headers);
+    match state
+        .ledger
+        .compute_stock(&state.parser.catalog.products, &business_id)
+    {
+        Ok(stock) => json_no_cache(StatusCode::OK, json!(stock)),
+        Err(e) => json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        ),
+    }
+}
+
+async fn get_daily_stock(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let business_id = resolve_business_id(&state, &headers);
+    match state
+        .ledger
+        .compute_daily_stock(&state.parser.catalog.products, &business_id, None)
+    {
+        Ok(daily) => json_no_cache(StatusCode::OK, json!(daily)),
+        Err(e) => json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        ),
+    }
+}
+
+async fn get_movements(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let business_id = resolve_business_id(&state, &headers);
+    match state.ledger.get_movements_for_api(&business_id) {
+        Ok(moves) => json_no_cache(StatusCode::OK, json!(moves)),
+        Err(e) => json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        ),
+    }
+}
+
+#[derive(Deserialize)]
+struct IncomingMovementItem {
+    product_id: String,
+    product_name: String,
+    action: String,
+    quantity: f64,
+    unit: String,
+}
+
+#[derive(Deserialize, Default)]
+struct PostMovementsPayload {
+    #[serde(default)]
+    items: Vec<IncomingMovementItem>,
+    synced: Option<bool>,
+}
+
+async fn post_movements(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<PostMovementsPayload>,
+) -> Response {
+    let business_id = resolve_business_id(&state, &headers);
+    let synced = payload.synced.unwrap_or(true);
+    let mut recorded = Vec::new();
+
+    for it in payload.items {
+        let mov = Movement::new(
+            business_id.clone(),
+            it.product_id,
+            it.product_name,
+            if it.action == "SALIDA" {
+                "OUT".to_string()
+            } else {
+                "IN".to_string()
+            },
+            it.quantity,
+            it.unit,
+            None,
+            None,
+            synced,
+        );
+        if let Err(e) = state.ledger.record_movement(&mov) {
+            return json_no_cache(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                json!({ "error": e.to_string() }),
+            );
+        }
+        recorded.push(mov);
+    }
+
+    match state
+        .ledger
+        .compute_daily_stock(&state.parser.catalog.products, &business_id, None)
+    {
+        Ok(daily_stock) => json_no_cache(
+            StatusCode::OK,
+            json!({
+                "status": "ok",
+                "recorded": recorded,
+                "daily_stock": daily_stock
+            }),
+        ),
+        Err(e) => json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        ),
+    }
+}
+
+async fn sync_users(
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<Value>,
+) -> Response {
+    let incoming = payload
+        .get("users")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    let mut synced_ids = Vec::new();
+
+    for u in incoming {
+        let id = u.get("id").and_then(Value::as_str).unwrap_or("");
+        let phone = u.get("phone").and_then(Value::as_str).unwrap_or("");
+        if id.is_empty() || phone.is_empty() {
+            continue;
+        }
+        let owner_name = u
+            .get("owner_name")
+            .and_then(Value::as_str)
+            .unwrap_or("Comerciante");
+        let business_name = u
+            .get("business_name")
+            .and_then(Value::as_str)
+            .unwrap_or("Mi Tienda");
+        let zone = u
+            .get("zone")
+            .and_then(Value::as_str)
+            .unwrap_or("Comuna 2, Yopal");
+        let pin_salt = u.get("pin_salt").and_then(Value::as_str).unwrap_or("");
+        let pin_hash = u.get("pin_hash").and_then(Value::as_str).unwrap_or("");
+        let habeas = value_as_bool(u.get("habeas_data_accepted"), true);
+        let created_at = u.get("created_at").and_then(Value::as_f64);
+
+        if let Err(e) = state.auth.sync_offline_user(
+            id,
+            phone,
+            owner_name,
+            business_name,
+            zone,
+            pin_salt,
+            pin_hash,
+            habeas,
+            created_at,
+        ) {
+            return json_no_cache(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                json!({ "error": e.to_string() }),
+            );
+        }
+        synced_ids.push(id.to_string());
+    }
+
+    let synced_count = synced_ids.len();
+    json_no_cache(
+        StatusCode::OK,
+        json!({
+            "status": "ok",
+            "synced_ids": synced_ids,
+            "synced_count": synced_count
+        }),
+    )
+}
+
+async fn sync_movements(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(payload): Json<Value>,
+) -> Response {
+    let fallback_business_id = resolve_business_id(&state, &headers);
+    let incoming = payload
+        .get("movements")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    let mut synced_ids = Vec::new();
+    let mut last_business_id = fallback_business_id.clone();
+
+    for m in incoming {
+        let Some(id) = m.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(product_id) = m.get("product_id").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(mtype) = m.get("type").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(quantity) = m.get("quantity").and_then(Value::as_f64) else {
+            continue;
+        };
+
+        let raw_ts = m
+            .get("timestamp")
+            .and_then(Value::as_f64)
+            .unwrap_or_else(now_unix_secs);
+        let ts_sec = if raw_ts > 1e11 {
+            raw_ts / 1000.0
+        } else {
+            raw_ts
+        };
+
+        let bid = m
+            .get("business_id")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+            .unwrap_or(&fallback_business_id)
+            .to_string();
+        last_business_id = bid.clone();
+
+        let mov = Movement {
+            id: id.to_string(),
+            business_id: bid,
+            product_id: product_id.to_string(),
+            product_name: m
+                .get("product_name")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string(),
+            movement_type: mtype.to_string(),
+            quantity,
+            unit: m
+                .get("unit")
+                .and_then(Value::as_str)
+                .unwrap_or("unidades")
+                .to_string(),
+            timestamp: ts_sec,
+            device_id: m
+                .get("device_id")
+                .and_then(Value::as_str)
+                .unwrap_or("android_mobile")
+                .to_string(),
+            synced: true,
+        };
+
+        if let Err(e) = state.ledger.record_movement(&mov) {
+            return json_no_cache(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                json!({ "error": e.to_string() }),
+            );
+        }
+        synced_ids.push(mov.id);
+    }
+
+    match state
+        .ledger
+        .compute_daily_stock(&state.parser.catalog.products, &last_business_id, None)
+    {
+        Ok(daily_stock) => {
+            let synced_count = synced_ids.len();
+            json_no_cache(
+                StatusCode::OK,
+                json!({
+                    "status": "ok",
+                    "synced_ids": synced_ids,
+                    "synced_count": synced_count,
+                    "daily_stock": daily_stock
+                }),
+            )
+        }
+        Err(e) => json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        ),
+    }
+}
+
+async fn sync_local(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let business_id = resolve_business_id(&state, &headers);
+    let pending = match state.ledger.get_pending_sync_movements(&business_id) {
+        Ok(p) => p,
+        Err(e) => {
+            return json_no_cache(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                json!({ "error": e.to_string() }),
+            );
+        }
+    };
+    let ids: Vec<String> = pending.into_iter().map(|m| m.id).collect();
+    if let Err(e) = state.ledger.mark_as_synced(&ids) {
+        return json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        );
+    }
+    json_no_cache(
+        StatusCode::OK,
+        json!({ "status": "ok", "synced_count": ids.len() }),
+    )
+}
+
+async fn collective_simulate(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Response {
+    let user = current_user(&state, &headers);
+    let my_id = user
+        .as_ref()
+        .map(|u| u.id.clone())
+        .unwrap_or_else(|| "t1".to_string());
+    let my_business = user
+        .as_ref()
+        .map(|u| u.business_name.clone())
+        .unwrap_or_else(|| "Tienda La Esperanza".to_string());
+
+    let orders = vec![
+        CollectiveOrderInput {
+            business_id: my_id,
+            business_name: my_business,
+            product_id: "prod_arroz_casanare".into(),
+            product_name: "Arroz Casanareño".into(),
+            quantity: 15.0,
+            unit: "bultos".into(),
+            retail_price_cop: 185_000.0,
+            wholesale_price_cop: 155_000.0,
+        },
+        CollectiveOrderInput {
+            business_id: "t2".into(),
+            business_name: "Agroinsumos Doña Martha".into(),
+            product_id: "prod_arroz_casanare".into(),
+            product_name: "Arroz Casanareño".into(),
+            quantity: 25.0,
+            unit: "bultos".into(),
+            retail_price_cop: 185_000.0,
+            wholesale_price_cop: 155_000.0,
+        },
+        CollectiveOrderInput {
+            business_id: "t3".into(),
+            business_name: "Minimarket El Llano".into(),
+            product_id: "prod_arroz_casanare".into(),
+            product_name: "Arroz Casanareño".into(),
+            quantity: 20.0,
+            unit: "bultos".into(),
+            retail_price_cop: 185_000.0,
+            wholesale_price_cop: 155_000.0,
+        },
+        CollectiveOrderInput {
+            business_id: "t4".into(),
+            business_name: "Comercializadora El Triunfo".into(),
+            product_id: "prod_arroz_casanare".into(),
+            product_name: "Arroz Casanareño".into(),
+            quantity: 10.0,
+            unit: "bultos".into(),
+            retail_price_cop: 185_000.0,
+            wholesale_price_cop: 155_000.0,
+        },
+    ];
+
+    let summary = state.collective.aggregate_orders(&orders);
+    json_no_cache(StatusCode::OK, json!(summary))
+}
+
+async fn reset_demo(State(state): State<Arc<AppState>>) -> Response {
+    match state.ledger.seed_demo_data(true) {
+        Ok(()) => json_no_cache(
+            StatusCode::OK,
+            json!({ "status": "ok", "message": "Datos reiniciados" }),
+        ),
+        Err(e) => json_no_cache(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({ "error": e.to_string() }),
+        ),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::hash_pin_mobile_sha256;
+    use axum::body::Body;
+    use axum::http::Request;
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    async fn call_json(
+        app: &Router,
+        method: &str,
+        uri: &str,
+        token: Option<&str>,
+        payload: Option<Value>,
+    ) -> (StatusCode, Value) {
+        let mut builder = Request::builder().method(method).uri(uri);
+        if let Some(tok) = token {
+            builder = builder.header(header::AUTHORIZATION, format!("Bearer {tok}"));
+        }
+        let body = if let Some(val) = payload {
+            builder = builder.header(header::CONTENT_TYPE, "application/json");
+            Body::from(val.to_string())
+        } else {
+            Body::empty()
+        };
+        let req = builder.body(body).unwrap();
+        let resp = app.clone().oneshot(req).await.unwrap();
+        let status = resp.status();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        let json: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+        (status, json)
+    }
+
+    #[tokio::test]
+    async fn test_e2e_offline_mobile_sync_and_store_isolation() {
+        let state = AppState::open(":memory:").unwrap();
+        let app = build_router(state, None);
+
+        // 1. Health check
+        let (st, health) = call_json(&app, "GET", "/api/health", None, None).await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(health["engine"], "rust-axum");
+
+        // 2. Sincronizar tienda creada offline en Android (habeas como entero 1 desde SQLite)
+        let salt = "abcdef0123456789abcdef0123456789";
+        let mobile_hash = hash_pin_mobile_sha256("2468", salt);
+        let (st, sync_u) = call_json(
+            &app,
+            "POST",
+            "/api/sync/users",
+            None,
+            Some(json!({
+                "users": [{
+                    "id": "tienda_rust_1",
+                    "phone": "3120001122",
+                    "owner_name": "Carlos",
+                    "business_name": "Tienda El Llano",
+                    "zone": "Yopal",
+                    "pin_salt": salt,
+                    "pin_hash": mobile_hash,
+                    "habeas_data_accepted": 1,
+                    "created_at": 1760000000000.0
+                }]
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(sync_u["synced_ids"][0], "tienda_rust_1");
+
+        // 3. Sincronizar movimiento de esa tienda (timestamp en milisegundos)
+        let (st, sync_m) = call_json(
+            &app,
+            "POST",
+            "/api/sync/movements",
+            None,
+            Some(json!({
+                "movements": [{
+                    "id": "mov_rust_1",
+                    "business_id": "tienda_rust_1",
+                    "product_id": "prod_arroz_casanare",
+                    "product_name": "Arroz Casanareño",
+                    "type": "IN",
+                    "quantity": 9.0,
+                    "unit": "bultos",
+                    "timestamp": 1760000005000.0
+                }]
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(sync_m["synced_ids"][0], "mov_rust_1");
+
+        // 4. Iniciar sesión en la web con la tienda sincronizada y validar aislamiento total
+        let (st, login) = call_json(
+            &app,
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({ "phone": "3120001122", "pin": "2468" })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
+        let token = login["token"].as_str().unwrap();
+
+        let (st, moves) = call_json(&app, "GET", "/api/movements", Some(token), None).await;
+        assert_eq!(st, StatusCode::OK);
+        let arr = moves.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["business_id"], "tienda_rust_1");
+        assert_eq!(arr[0]["quantity"], 9.0);
+
+        // 5. Verificar que Don Pedro sigue aislado con sus propios movimientos
+        let (st, demo_login) = call_json(
+            &app,
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({ "phone": "3101234567", "pin": "1234" })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
+        let demo_tok = demo_login["token"].as_str().unwrap();
+        let (st, demo_moves) = call_json(&app, "GET", "/api/movements", Some(demo_tok), None).await;
+        assert_eq!(st, StatusCode::OK);
+        assert!(demo_moves
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|m| m["business_id"] == "tienda_demo"));
+    }
+}
