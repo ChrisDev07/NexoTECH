@@ -510,67 +510,96 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   void _handleSpokenPhrase(String phrase) {
     final parsed = _nlp.parsePhrase(phrase);
     if (parsed.isEmpty) {
-      _showSnack('⚠️ Escuché "$phrase", pero no reconocí un producto del catálogo.');
+      _showSnack('⚠️ Escuché "$phrase", pero no reconocí productos del catálogo.');
       return;
     }
-    final first = parsed.first;
-    final prod = _inventory.where((p) => p.id == first.productId).firstOrNull;
-    if (prod != null) {
-      _openConfirm(
-        prod,
-        isSale: first.action == 'SALIDA',
-        qty: first.quantity,
-      );
+
+    final batch = <MovementItemInput>[];
+    for (final item in parsed) {
+      final prod = _inventory.where((p) => p.id == item.productId).firstOrNull;
+      if (prod != null) {
+        batch.add(
+          MovementItemInput(
+            product: prod,
+            isSale: item.action == 'SALIDA',
+            quantity: item.quantity,
+          ),
+        );
+      }
     }
+
+    if (batch.isEmpty) {
+      _showSnack('⚠️ No encontré los productos escuchados en tu bodega.');
+      return;
+    }
+
+    _openConfirmBatch(batch);
   }
 
-  void _openConfirm(ProductStock product, {bool isSale = true, double qty = 1}) {
+  void _openConfirmBatch(List<MovementItemInput> batch) {
     final user = _currentUser;
-    if (user == null) return;
+    if (user == null || batch.isEmpty) return;
 
     showOrigoConfirmationSheet(
       context: context,
-      product: product,
-      initialIsSale: isSale,
-      initialQty: qty,
-      onConfirm: (confirmedSale, confirmedQty) async {
-        // 0. Validación defensiva: nunca permitir salidas mayores al inventario disponible
-        if (confirmedSale && confirmedQty > product.quantity + 1e-6) {
-          _showSnack(
-            '⚠️ Stock insuficiente para ${product.name}: solo tienes ${product.quantity.toStringAsFixed(product.quantity % 1 == 0 ? 0 : 1)} ${product.unit} disponibles.',
-          );
-          return;
+      items: batch,
+      onConfirm: (confirmedItems) async {
+        // 0. Validación defensiva para cada producto
+        for (final item in confirmedItems) {
+          if (item.isSale && item.quantity > item.product.quantity + 1e-6) {
+            final availStr = item.product.quantity % 1 == 0
+                ? item.product.quantity.toInt().toString()
+                : item.product.quantity.toStringAsFixed(1);
+            _showSnack(
+              '⚠️ Stock insuficiente para ${item.product.name}: solo tienes $availStr ${item.product.unit} disponibles.',
+            );
+            return;
+          }
         }
 
-        // 1. Guardar siempre primero en SQLite aislado por `user.id`
-        await _ledger.recordMovement(
-          businessId: user.id,
-          productId: product.id,
-          productName: product.name,
-          isSale: confirmedSale,
-          quantity: confirmedQty,
-          unit: product.unit,
-          synced: false,
-        );
+        // 1. Guardar todos los movimientos en el Libro Mayor SQLite local
+        for (final item in confirmedItems) {
+          await _ledger.recordMovement(
+            businessId: user.id,
+            productId: item.product.id,
+            productName: item.product.name,
+            isSale: item.isSale,
+            quantity: item.quantity,
+            unit: item.product.unit,
+            synced: false,
+          );
+        }
+
         await _loadLedgerForCurrentUser();
         if (mounted) setState(() => _liveTranscript = '');
+
+        final summaryList = confirmedItems.map((i) {
+          final q = i.quantity % 1 == 0 ? i.quantity.toInt() : i.quantity;
+          return '${i.isSale ? "Venta" : "Entrada"}: $q ${i.product.unit} de ${i.product.name}';
+        }).join(', ');
 
         // 2. Verificar conectividad real del celular y subir si hay internet
         final online = await _sync.checkOnlineNow();
         if (!online) {
-          _showSnack('💾 Sin señal: guardado en tu tienda local. Se subirá al recuperar internet.');
+          _showSnack('✈️ Sin señal: guardado en tu bodega local: $summaryList');
           return;
         }
 
         final syncRes = await _sync.syncPendingMovements();
         await _loadLedgerForCurrentUser();
         if (syncRes.reachedServer) {
-          _showSnack('✅ ¡Guardado y subido automáticamente al servidor!');
+          _showSnack('✅ ¡$summaryList guardados y sincronizados!');
         } else {
-          _showSnack('💾 Guardado en local (pendiente de conectar con el servidor).');
+          _showSnack('💾 Guardado en local: $summaryList');
         }
       },
     );
+  }
+
+  void _openConfirm(ProductStock product, {bool isSale = true, double qty = 1}) {
+    _openConfirmBatch([
+      MovementItemInput(product: product, isSale: isSale, quantity: qty),
+    ]);
   }
 
   Future<void> _openServerConfigDialog() async {
