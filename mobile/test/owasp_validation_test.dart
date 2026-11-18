@@ -34,5 +34,15 @@ void main() {
         }
       }, throwsArgumentError);
     });
+
+    test('SQL Injection characters sanitized in phone numbers (Anti-Injection)', () {
+      const maliciousPhone = "3101234567'; DROP TABLE local_users; --";
+      final clean = OfflineLedgerService.sanitizePhone(maliciousPhone);
+      expect(clean, '3101234567');
+      expect(clean.contains('DROP'), false);
+      expect(clean.contains("'"), false);
+      expect(clean.contains(';'), false);
+      expect(clean.contains('--'), false);
+    });
   });
 }

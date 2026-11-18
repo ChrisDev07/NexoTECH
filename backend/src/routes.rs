@@ -1453,4 +1453,62 @@ mod tests {
         assert_eq!(st, StatusCode::FORBIDDEN);
         assert!(err_idor["error"].as_str().unwrap().contains("permisos"));
     }
+
+    #[tokio::test]
+    async fn test_owasp_sql_injection_defense() {
+        let state = AppState::open(":memory:").unwrap();
+        let app = build_router(state, None);
+
+        // 1. Intento de bypass de autenticación por inyección clásica (' OR '1'='1)
+        let (st, _login_inj) = call_json(
+            &app,
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({
+                "phone": "3101234567' OR '1'='1' --",
+                "pin": "' OR '1'='1"
+            })),
+        )
+        .await;
+        // Debe ser rechazado (401 o 400), nunca dar 200 OK
+        assert_ne!(st, StatusCode::OK);
+        assert_eq!(st, StatusCode::UNAUTHORIZED);
+
+        // 2. Intento de inyección destructiva (DROP TABLE) en registro de usuario
+        let (_st, _) = call_json(
+            &app,
+            "POST",
+            "/api/auth/register",
+            None,
+            Some(json!({
+                "phone": "3119998877'; DROP TABLE users; --",
+                "pin": "1234",
+                "owner_name": "Inyector'); DROP TABLE users; --",
+                "business_name": "Tienda Inyectada",
+                "zone": "Yopal",
+                "habeas_data_accepted": true
+            })),
+        )
+        .await;
+
+        // 3. Verificar que la base de datos y la tabla 'users' siguen 100% íntegras y operativas
+        let (st_h, _health) = call_json(&app, "GET", "/api/health", None, None).await;
+        assert_eq!(st_h, StatusCode::OK);
+
+        // La cuenta demo sigue existiendo y puede autenticarse perfectamente
+        let (st, demo_login) = call_json(
+            &app,
+            "POST",
+            "/api/auth/login",
+            None,
+            Some(json!({
+                "phone": "3101234567",
+                "pin": "1234"
+            })),
+        )
+        .await;
+        assert_eq!(st, StatusCode::OK);
+        assert_eq!(demo_login["user"]["id"], "tienda_demo");
+    }
 }
