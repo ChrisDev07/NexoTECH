@@ -492,21 +492,36 @@ impl LocalLedger {
             |r| r.get(0),
         )?;
         if count > 0 {
+            let _ = conn.execute("UPDATE collective_contributions SET zone = 'Yopal' WHERE zone LIKE '%Comuna%'", []);
             return Ok(());
         }
         let now = now_unix_secs();
         let defaults = [
-            ("col_demo_1", "Comuna 2, Yopal", "tienda_demo", "Tienda La Esperanza", 15.0),
-            ("col_demo_2", "Comuna 2, Yopal", "t2", "Agroinsumos Doña Martha", 25.0),
-            ("col_demo_3", "Comuna 2, Yopal", "t3", "Minimarket El Llano", 20.0),
-            ("col_demo_4", "Comuna 2, Yopal", "t4", "Comercializadora El Triunfo", 10.0),
+            // Arroz Casanareño (Meta 100 bultos)
+            ("col_demo_1", "Yopal", "tienda_demo", "Tienda La Esperanza", "prod_arroz_casanare", "Arroz Casanareño", 15.0, "bultos", 185000.0, 155000.0),
+            ("col_demo_2", "Yopal", "t2", "Agroinsumos Doña Martha", "prod_arroz_casanare", "Arroz Casanareño", 25.0, "bultos", 185000.0, 155000.0),
+            ("col_demo_3", "Yopal", "t3", "Minimarket El Llano", "prod_arroz_casanare", "Arroz Casanareño", 20.0, "bultos", 185000.0, 155000.0),
+            ("col_demo_4", "Yopal", "t4", "Comercializadora El Triunfo", "prod_arroz_casanare", "Arroz Casanareño", 10.0, "bultos", 185000.0, 155000.0),
+
+            // Aceite Vegetal 900ml (Meta 40 cajas)
+            ("col_demo_5", "Yopal", "tienda_demo", "Tienda La Esperanza", "prod_aceite_vegetal", "Aceite Vegetal 900ml", 8.0, "cajas", 115000.0, 94000.0),
+            ("col_demo_6", "Yopal", "t3", "Minimarket El Llano", "prod_aceite_vegetal", "Aceite Vegetal 900ml", 12.0, "cajas", 115000.0, 94000.0),
+            ("col_demo_7", "Yopal", "t5", "Granero El Morichal", "prod_aceite_vegetal", "Aceite Vegetal 900ml", 6.0, "cajas", 115000.0, 94000.0),
+
+            // Cemento Gris 50kg (Meta 80 bultos)
+            ("col_demo_8", "Yopal", "t6", "Ferretería Don Luis", "prod_cemento_gris", "Cemento Gris 50kg", 30.0, "bultos", 34000.0, 28500.0),
+            ("col_demo_9", "Yopal", "t4", "Comercializadora El Triunfo", "prod_cemento_gris", "Cemento Gris 50kg", 25.0, "bultos", 34000.0, 28500.0),
+
+            // Abono Triple 15 (Meta 50 bultos)
+            ("col_demo_10", "Yopal", "t2", "Agroinsumos Doña Martha", "prod_abono_triple15", "Abono Triple 15", 20.0, "bultos", 210000.0, 178000.0),
+            ("col_demo_11", "Yopal", "t7", "Insumos Agrícolas Casanare", "prod_abono_triple15", "Abono Triple 15", 12.0, "bultos", 210000.0, 178000.0),
         ];
-        for (id, zone, bid, bname, qty) in defaults {
+        for (id, zone, bid, bname, pid, pname, qty, unit, ret, who) in defaults {
             conn.execute(
                 "INSERT INTO collective_contributions
                 (id, zone, business_id, business_name, product_id, product_name, quantity, unit, retail_price_cop, wholesale_price_cop, created_at)
-                VALUES (?1, ?2, ?3, ?4, 'prod_arroz_casanare', 'Arroz Casanareño', ?5, 'bultos', 185000.0, 155000.0, ?6)",
-                params![id, zone, bid, bname, qty, now],
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+                params![id, zone, bid, bname, pid, pname, qty, unit, ret, who, now],
             )?;
         }
         Ok(())

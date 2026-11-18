@@ -59,10 +59,10 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   bool _isListening = false;
   bool _isVoiceModelReady = false;
   bool _isHistoryExpanded = true;
-  int _extraCollectiveBultos = 0;
   Map<String, dynamic>? _collectiveData;
   bool _loadingCollective = false;
   String _liveTranscript = '';
+  String? _focusCollectiveProductId;
 
   final List<MovementLog> _recentMovements = [];
   List<ProductStock> _inventory = [];
@@ -285,23 +285,91 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
     }
   }
 
-  Future<void> _handleJoinCollective() async {
+  Future<void> _handleJoinProduct({
+    required String productId,
+    required String productName,
+    required String unit,
+    required double quantity,
+  }) async {
     final user = _currentUser;
     if (user == null) return;
     if (mounted) setState(() => _loadingCollective = true);
     try {
-      final live = await _sync.joinCollectiveOrder(user: user, quantity: 10.0);
+      final live = await _sync.joinCollectiveOrder(
+        user: user,
+        productId: productId,
+        productName: productName,
+        unit: unit,
+        quantity: quantity,
+      );
       if (!mounted) return;
       if (live != null) {
         setState(() => _collectiveData = live);
-        _showSnack('🎉 ¡Sumaste +10 bultos reales al pedido de ${user.zone} en el servidor!');
+        _showSnack('🎉 ¡Sumaste +${quantity.toInt()} $unit a $productName en el servidor!');
       } else {
-        setState(() => _extraCollectiveBultos += 10);
-        _showSnack('✈️ Sin señal: sumados +10 bultos en vista local.');
+        _showSnack('✈️ Sin señal: se sincronizará cuando recuperes conexión.');
       }
     } finally {
       if (mounted) setState(() => _loadingCollective = false);
     }
+  }
+
+  Future<void> _handleProposePurchase(ProposePurchaseInput input) async {
+    final user = _currentUser;
+    if (user == null) return;
+    if (mounted) setState(() => _loadingCollective = true);
+    try {
+      final live = await _sync.joinCollectiveOrder(
+        user: user,
+        productId: input.productId,
+        productName: input.productName,
+        unit: input.unit,
+        quantity: input.quantity,
+      );
+      if (!mounted) return;
+      if (live != null) {
+        setState(() => _collectiveData = live);
+        _showSnack('🎉 ¡Compra colectiva de "${input.productName}" publicada en el tablón!');
+      } else {
+        _showSnack('✈️ Sin señal: se publicará al recuperar conexión.');
+      }
+    } finally {
+      if (mounted) setState(() => _loadingCollective = false);
+    }
+  }
+
+  void _handleOrderInCommunity(ProductStock product) {
+    setState(() {
+      _selectedTab = 2; // Pestaña Comunidad
+      _focusCollectiveProductId = product.id;
+    });
+    _refreshCollective();
+  }
+
+  Future<void> _handleReceiveToInventory({
+    required String productId,
+    required String productName,
+    required double quantity,
+    required String unit,
+  }) async {
+    final user = _currentUser;
+    if (user == null) return;
+
+    await _ledger.recordMovement(
+      businessId: user.id,
+      productId: productId,
+      productName: productName,
+      isSale: false, // ENTRADA por despacho de compra colectiva
+      quantity: quantity,
+      unit: unit,
+      synced: false,
+    );
+    await _loadLedgerForCurrentUser();
+    await _attemptAutoSync(notifyOnSuccess: false);
+
+    _showSnack(
+      '📦 ¡Ingresados +${quantity.toInt()} $unit de $productName a tu Bodega con descuento mayorista!',
+    );
   }
 
   Future<void> _handleAddCustomProduct(NewProductInput input) async {
@@ -573,6 +641,8 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
           OrigoHeader(
             ownerName: _currentUser!.ownerName,
             storeLocation: '${_currentUser!.businessName} · ${_currentUser!.zone}',
+            documentId: _currentUser!.documentId,
+            address: _currentUser!.address,
             onConfigureServer: _openServerConfigDialog,
             onLogout: _onLogout,
           ),
@@ -595,15 +665,18 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
                   inventory: _inventory,
                   onSelectProduct: (p) => _openConfirm(p, isSale: true, qty: 1),
                   onAddProduct: _handleAddCustomProduct,
+                  onOrderInCommunity: _handleOrderInCommunity,
                 ),
                 CommunityScreen(
                   zone: _currentUser!.zone,
                   currentBusinessId: _currentUser!.id,
                   liveData: _collectiveData,
-                  localExtraBultos: _extraCollectiveBultos,
                   isLoading: _loadingCollective,
+                  focusProductId: _focusCollectiveProductId,
                   onRefresh: _refreshCollective,
-                  onJoinOrder: _handleJoinCollective,
+                  onJoinProduct: _handleJoinProduct,
+                  onProposePurchase: _handleProposePurchase,
+                  onReceiveToInventory: _handleReceiveToInventory,
                 ),
               ],
             ),

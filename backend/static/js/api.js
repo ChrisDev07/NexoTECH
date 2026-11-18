@@ -183,11 +183,16 @@ window.OrigoAPI = (() => {
     return res.json();
   }
 
-  async function joinCollectiveOrder(quantity = 10) {
+  async function joinCollectiveOrder(productId = 'prod_arroz_casanare', quantity = 10, productName = '', unit = '') {
     const res = await fetch('/api/collective/join', {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ quantity })
+      body: JSON.stringify({
+        product_id: productId,
+        product_name: productName,
+        quantity: Number(quantity),
+        unit: unit
+      })
     });
     return res.json();
   }

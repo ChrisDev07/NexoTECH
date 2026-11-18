@@ -54,11 +54,10 @@
             <input id="regBusiness" class="form-input" type="text" placeholder="Ej. Agroinsumos El Llano" required>
           </div>
           <div class="form-field">
-            <label class="form-label" for="regZone">📍 Municipio / Zona en Casanare</label>
+            <label class="form-label" for="regZone">📍 Municipio en Casanare</label>
             <select id="regZone" class="form-input">
-              <option value="Comuna 2, Yopal">Comuna 2, Yopal</option>
-              <option value="Comuna 5, Yopal">Comuna 5, Yopal</option>
-              <option value="Centro, Aguazul">Centro, Aguazul</option>
+              <option value="Yopal" selected>Yopal</option>
+              <option value="Aguazul">Aguazul</option>
               <option value="Villanueva">Villanueva</option>
               <option value="Tauramena">Tauramena</option>
               <option value="Maní">Maní</option>
@@ -109,7 +108,7 @@
           </div>
         </div>
         <div id="greetingName" class="greeting">¡Hola, Don Pedro! ☀️</div>
-        <div id="storeSubtitle" class="store-sub">📍 Tienda La Esperanza · Comuna 2, Yopal</div>
+        <div id="storeSubtitle" class="store-sub">📍 Tienda La Esperanza · Yopal</div>
       </header>
 
       <!-- CONTENIDO PRINCIPAL -->
@@ -194,57 +193,43 @@
           <div id="fullStockList" class="stock-list"></div>
         </section>
 
-        <!-- PESTAÑA 3: COMPRAS EN COMUNIDAD -->
+        <!-- PESTAÑA 3: COMPRAS EN COMUNIDAD (TABLÓN DESPLEGABLE) -->
         <section id="tab-community" class="tab-view">
           <div class="community-hero">
-            <h2>🤝 Juntos compramos más barato</h2>
-            <p>Unimos los pedidos de tu zona para comprar a precio de molino y repartir el costo del flete.</p>
+            <h2 id="communityZoneHeroTitle">🤝 Tablón Comunitario · Casanare</h2>
+            <p>Agrupamos pedidos por producto en tu zona para comprar a precio de molino/distribuidor y compartir el flete.</p>
           </div>
 
-          <div class="progress-card">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-              <strong style="font-size: 1rem;">🌾 Arroz Casanareño (50kg)</strong>
-              <span id="discountBadge" style="background: var(--primary-soft); color: var(--primary-text); padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 800;">16.2% Dcto</span>
-            </div>
-            <div class="progress-bar-bg">
-              <div id="volumeBar" class="progress-bar-fill" style="width: 70%;"></div>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-size: 0.88rem; color: var(--text-muted); font-weight: 700;">
-              <span id="volumeLabel">70 / 100 bultos reunidos</span>
-              <span id="storesBadge">4 tiendas</span>
-            </div>
-          </div>
-
-          <div class="savings-card">
-            <div id="communityZoneTitle" style="font-weight: 900; color: #92400e; font-size: 1.05rem; margin-bottom: 12px;">
-              💰 Ahorro de la semana · Comuna 2
+          <div class="savings-card" style="margin-bottom: 14px;">
+            <div id="communityZoneTitle" style="font-weight: 900; color: #92400e; font-size: 1.05rem; margin-bottom: 8px;">
+              💰 Impacto acumulado en tu red
             </div>
             <div class="savings-row">
-              <span>Descuento por volumen mayorista:</span>
-              <strong id="commPriceSaving">$2.100.000 COP</strong>
+              <span>Tiendas en la red:</span>
+              <strong id="commStoresTotal">0 tiendas</strong>
             </div>
             <div class="savings-row">
               <span>Ahorro en flete compartido:</span>
-              <strong id="commFreightSaving">$360.000 COP</strong>
-            </div>
-            <div class="savings-row">
-              <span>Flete por cada tienda:</span>
-              <strong id="commFreightEach">$30.000 COP</strong>
+              <strong id="commFreightSaving">$0 COP</strong>
             </div>
             <div class="savings-total">
-              <span style="font-weight: 900; color: #78350f;">AHORRO TOTAL NETO:</span>
-              <span id="commTotalSaving" class="savings-total-val">$2.460.000</span>
+              <span style="font-weight: 900; color: #78350f;">AHORRO TOTAL DE LA RED:</span>
+              <span id="commTotalSaving" class="savings-total-val">$0 COP</span>
             </div>
           </div>
 
-          <button id="joinOrderBtn" class="btn-join-community" onclick="OrigoCommunity.joinOrder()">
-            🤝 Sumar mi pedido a la compra semanal
-          </button>
-
-          <div class="section-head">
-            <div class="section-title">🏪 Vecinos en este pedido</div>
+          <div class="board-header">
+            <div>
+              <div class="section-title" style="font-size: 1.05rem;">📋 Pedidos en curso</div>
+              <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">Toca una tarjeta para desplegar detalles y participar</div>
+            </div>
+            <button type="button" class="btn-primary" style="padding: 7px 12px; font-size: 0.82rem; border-radius: 12px;" onclick="OrigoCommunity.openProposeModal()">
+              ➕ Proponer compra
+            </button>
           </div>
-          <div id="neighborsList"></div>
+
+          <!-- LISTA DE TARJETAS DESPLEGABLES DEL TABLÓN -->
+          <div id="collectiveBoardList"></div>
         </section>
       </main>
 
@@ -323,6 +308,56 @@
 
         <button type="submit" class="btn-confirm-big" style="margin-top: 12px;">✔ Guardar producto</button>
         <button type="button" class="btn-cancel-big" onclick="OrigoInventory.closeNewProductModal()">Cancelar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL PROPONER COMPRA COLECTIVA EN EL TABLÓN -->
+  <div id="proposePurchaseModal" class="modal-backdrop" onclick="if(event.target === this) OrigoCommunity.closeProposeModal()">
+    <div class="bottom-sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title" style="font-size: 1.15rem;">➕ Proponer compra colectiva</div>
+      <div class="sheet-sub">Publica un artículo en el tablón para que las tiendas de tu zona se unan</div>
+      <form onsubmit="OrigoCommunity.submitProposePurchase(event)">
+        <label class="auth-label" for="propProductSelect">Selecciona o escribe el producto</label>
+        <select id="propProductSelect" class="auth-input" onchange="OrigoCommunity.onProposeProductChange(this.value)">
+          <option value="prod_arroz_casanare">🌾 Arroz Casanareño (50kg)</option>
+          <option value="prod_aceite_vegetal">🛢️ Aceite Vegetal 900ml</option>
+          <option value="prod_cemento_gris">🧱 Cemento Gris 50kg</option>
+          <option value="prod_abono_triple15">🌱 Abono Triple 15</option>
+          <option value="prod_panela_criolla">🟫 Panela Criolla</option>
+          <option value="prod_papa_pastusa">🥔 Papa Pastusa / Criolla</option>
+          <option value="prod_sal_marina">🧂 Sal Marina Refinada</option>
+          <option value="prod_harina_pan">🌽 Harina de Maíz Precocida</option>
+          <option value="custom">✨ Otro artículo personalizado...</option>
+        </select>
+
+        <div id="propCustomRow" style="display: none;">
+          <label class="auth-label" for="propCustomName">Nombre del artículo</label>
+          <input id="propCustomName" class="auth-input" type="text" placeholder="Ej. Lenteja Importada" />
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label class="auth-label" for="propUnit">Unidad</label>
+            <select id="propUnit" class="auth-input">
+              <option value="bultos">bultos</option>
+              <option value="cajas">cajas</option>
+              <option value="pacas">pacas</option>
+              <option value="arrobas">arrobas</option>
+              <option value="kilos">kilos</option>
+              <option value="libras">libras</option>
+              <option value="unidades">unidades</option>
+            </select>
+          </div>
+          <div>
+            <label class="auth-label" for="propMyQty">Mi aporte inicial</label>
+            <input id="propMyQty" class="auth-input" type="number" min="1" value="10" required />
+          </div>
+        </div>
+
+        <button type="submit" class="btn-confirm-big" style="margin-top: 14px;">✔ Publicar en el Tablón</button>
+        <button type="button" class="btn-cancel-big" onclick="OrigoCommunity.closeProposeModal()">Cancelar</button>
       </form>
     </div>
   </div>

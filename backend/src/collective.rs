@@ -1,5 +1,5 @@
 //! Módulo de Central de Compras Colectivas para Origo (CREATIC Casanare).
-//! Agrupa demanda geolocalizada por comuna/vereda y calcula descuentos mayoristas y flete compartido.
+//! Agrupa demanda geolocalizada por municipio/región y calcula descuentos mayoristas y flete compartido.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -28,6 +28,7 @@ pub struct CollectiveProductResult {
     pub product_id: String,
     pub product_name: String,
     pub total_quantity: f64,
+    pub target_quantity: f64,
     pub unit: String,
     pub retail_total_cop: f64,
     pub wholesale_total_cop: f64,
@@ -46,6 +47,20 @@ pub struct CollectiveSummary {
     pub freight_per_store_cop: f64,
     pub total_net_savings_cop: f64,
     pub products: Vec<CollectiveProductResult>,
+}
+
+pub fn default_target_for_product(product_id: &str, current_qty: f64) -> f64 {
+    match product_id {
+        "prod_arroz_casanare" => 100.0,
+        "prod_aceite_vegetal" => 40.0,
+        "prod_cemento_gris" => 80.0,
+        "prod_abono_triple15" => 50.0,
+        "prod_panela_criolla" => 40.0,
+        "prod_papa_pastusa" => 50.0,
+        "prod_sal_marina" => 40.0,
+        "prod_harina_pan" => 40.0,
+        _ => (current_qty * 1.5).max(30.0).round(),
+    }
 }
 
 pub struct CollectivePurchasingEngine {
@@ -89,6 +104,7 @@ impl CollectivePurchasingEngine {
                         product_id: o.product_id.clone(),
                         product_name: o.product_name.clone(),
                         total_quantity: 0.0,
+                        target_quantity: 100.0,
                         unit: o.unit.clone(),
                         retail_total_cop: 0.0,
                         wholesale_total_cop: 0.0,
@@ -129,6 +145,7 @@ impl CollectivePurchasingEngine {
                 item.savings_cop = saving;
                 item.discount_percentage = discount_pct;
                 item.stores_count = item.contributions.len();
+                item.target_quantity = default_target_for_product(&pid, item.total_quantity);
 
                 total_product_savings += saving;
                 products.push(item);

@@ -22,12 +22,14 @@ class InventoryScreen extends StatefulWidget {
   final List<ProductStock> inventory;
   final void Function(ProductStock product) onSelectProduct;
   final Future<void> Function(NewProductInput input) onAddProduct;
+  final void Function(ProductStock product)? onOrderInCommunity;
 
   const InventoryScreen({
     super.key,
     required this.inventory,
     required this.onSelectProduct,
     required this.onAddProduct,
+    this.onOrderInCommunity,
   });
 
   @override
@@ -312,6 +314,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
           (item) => ProductCard(
             item: item,
             onTap: () => widget.onSelectProduct(item),
+            onOrderInCommunity: widget.onOrderInCommunity != null ? () => widget.onOrderInCommunity!(item) : null,
           ),
         ),
       ],
