@@ -104,7 +104,7 @@ class AutoSyncService {
               'pin': pin.trim(),
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
 
       if (resp.statusCode == 200) {
         final data = jsonDecode(resp.body) as Map<String, dynamic>;
@@ -149,7 +149,7 @@ class AutoSyncService {
     try {
       final prodResp = await http
           .get(Uri.parse('$baseUrl/api/products'), headers: headers)
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
       if (prodResp.statusCode == 200) {
         final data = jsonDecode(prodResp.body) as Map<String, dynamic>;
         final list = (data['custom_products'] as List? ?? [])
@@ -162,7 +162,7 @@ class AutoSyncService {
     try {
       final movResp = await http
           .get(Uri.parse('$baseUrl/api/movements'), headers: headers)
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
       if (movResp.statusCode == 200) {
         final list = (jsonDecode(movResp.body) as List? ?? [])
             .whereType<Map<String, dynamic>>()
@@ -173,7 +173,8 @@ class AutoSyncService {
   }
 
   /// Sincroniza en orden: 1) cuentas offline, 2) productos propios, 3) movimientos pendientes.
-  Future<SyncResult> syncPendingMovements() async {
+  /// [force]: Si es true, omite la comprobación preliminar del canal nativo e intenta conectar directamente por HTTP.
+  Future<SyncResult> syncPendingMovements({bool force = false}) async {
     if (_isSyncing) {
       final pending = await _ledger.getPendingMovements();
       return SyncResult(reachedServer: false, syncedCount: 0, pendingRemaining: pending.length);
@@ -192,9 +193,11 @@ class AutoSyncService {
       );
     }
 
-    final online = await checkOnlineNow();
-    if (!online) {
-      return SyncResult(reachedServer: false, syncedCount: 0, pendingRemaining: pendingMoves.length);
+    if (!force) {
+      final online = await checkOnlineNow();
+      if (!online) {
+        return SyncResult(reachedServer: false, syncedCount: 0, pendingRemaining: pendingMoves.length);
+      }
     }
 
     _isSyncing = true;
@@ -214,10 +217,11 @@ class AutoSyncService {
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode({'users': pendingUsers}),
             )
-            .timeout(const Duration(seconds: 6));
+            .timeout(const Duration(seconds: 18));
 
         if (usersResp.statusCode == 200) {
           reached = true;
+          _lastKnownOnline = true;
           final data = jsonDecode(usersResp.body) as Map<String, dynamic>;
           final ids = (data['synced_ids'] as List? ?? []).map((e) => e.toString()).toList();
           await _ledger.markUsersSynced(ids);
@@ -233,10 +237,11 @@ class AutoSyncService {
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode({'products': pendingProducts}),
             )
-            .timeout(const Duration(seconds: 6));
+            .timeout(const Duration(seconds: 18));
 
         if (prodResp.statusCode == 200) {
           reached = true;
+          _lastKnownOnline = true;
           final data = jsonDecode(prodResp.body) as Map<String, dynamic>;
           final ids = (data['synced_ids'] as List? ?? []).map((e) => e.toString()).toList();
           await _ledger.markProductsSynced(ids);
@@ -268,10 +273,11 @@ class AutoSyncService {
               headers: {'Content-Type': 'application/json'},
               body: jsonEncode(payload),
             )
-            .timeout(const Duration(seconds: 6));
+            .timeout(const Duration(seconds: 18));
 
         if (response.statusCode == 200) {
           reached = true;
+          _lastKnownOnline = true;
           final data = jsonDecode(response.body) as Map<String, dynamic>;
           final syncedIds = (data['synced_ids'] as List? ?? []).map((e) => e.toString()).toList();
           await _ledger.markIdsAsSynced(syncedIds);
@@ -308,7 +314,7 @@ class AutoSyncService {
       final baseUrl = await _ledger.getServerUrl();
       final resp = await http
           .get(Uri.parse('$baseUrl/api/collective'))
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
       if (resp.statusCode == 200) {
         return jsonDecode(resp.body) as Map<String, dynamic>;
       }
@@ -342,7 +348,7 @@ class AutoSyncService {
               'unit': unit,
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 15));
       if (resp.statusCode == 200) {
         return jsonDecode(resp.body) as Map<String, dynamic>;
       }

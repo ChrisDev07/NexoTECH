@@ -61,6 +61,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
   bool _isListening = false;
   bool _isVoiceModelReady = false;
   bool _isHistoryExpanded = true;
+  bool _isManualSyncing = false;
   Map<String, dynamic>? _collectiveData;
   bool _loadingCollective = false;
   String _liveTranscript = '';
@@ -180,9 +181,22 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
         _showSnack('✈️ Sin señal: los cambios se guardarán localmente en tu celular.');
         return;
       }
-      await Future.delayed(const Duration(milliseconds: 1500));
-      if (!mounted) return;
-      await _attemptAutoSync(notifyOnSuccess: true);
+      _showSnack('📶 Conexión detectada: sincronizando con la nube...');
+      // Reintentos progresivos al reconectar a internet (1.5s, 4s, 7.5s)
+      for (final delayMs in [1500, 3500, 6000]) {
+        await Future.delayed(Duration(milliseconds: delayMs));
+        if (!mounted) return;
+        final hasPending = _recentMovements.any((m) => !m.synced);
+        final pendingProds = await _ledger.getPendingCustomProducts();
+        final pendingUsers = await _ledger.getPendingUsers();
+        if (!hasPending && pendingProds.isEmpty && pendingUsers.isEmpty) {
+          await _refreshCollective();
+          return;
+        }
+        await _attemptAutoSync(notifyOnSuccess: true, force: true);
+        final stillPending = await _ledger.getPendingMovements();
+        if (stillPending.isEmpty) return;
+      }
     };
 
     try {
@@ -251,27 +265,47 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
       ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _attemptAutoSync({required bool notifyOnSuccess}) async {
-    final result = await _sync.syncPendingMovements();
-    if (result.syncedCount > 0 ||
-        result.syncedUsersCount > 0 ||
-        result.syncedProductsCount > 0) {
-      await _loadLedgerForCurrentUser();
-      if (notifyOnSuccess) {
-        final parts = <String>[];
-        if (result.syncedUsersCount > 0) parts.add('tienda sincronizada');
-        if (result.syncedProductsCount > 0) {
-          parts.add('${result.syncedProductsCount} producto${result.syncedProductsCount == 1 ? "" : "s"}');
+  Future<void> _attemptAutoSync({
+    required bool notifyOnSuccess,
+    bool force = false,
+  }) async {
+    if (_isManualSyncing) return;
+    if (mounted) setState(() => _isManualSyncing = true);
+    try {
+      final result = await _sync.syncPendingMovements(force: force);
+      if (result.syncedCount > 0 ||
+          result.syncedUsersCount > 0 ||
+          result.syncedProductsCount > 0) {
+        await _loadLedgerForCurrentUser();
+        if (notifyOnSuccess) {
+          final parts = <String>[];
+          if (result.syncedUsersCount > 0) parts.add('tienda sincronizada');
+          if (result.syncedProductsCount > 0) {
+            parts.add('${result.syncedProductsCount} producto${result.syncedProductsCount == 1 ? "" : "s"}');
+          }
+          if (result.syncedCount > 0) {
+            parts.add('${result.syncedCount} movimiento${result.syncedCount == 1 ? "" : "s"}');
+          }
+          _showSnack('☁️ ¡Sincronizado con éxito! Subido: ${parts.join(", ")}.');
         }
-        if (result.syncedCount > 0) {
-          parts.add('${result.syncedCount} movimiento${result.syncedCount == 1 ? "" : "s"}');
+      } else if (notifyOnSuccess) {
+        if (result.reachedServer) {
+          _showSnack('☁️ Todo el inventario está al día con la nube.');
+        } else {
+          _showSnack('✈️ No se pudo conectar al servidor. Reintentando automáticamente...');
         }
-        _showSnack('☁️ ¡Internet detectado! Subido al servidor: ${parts.join(", ")}.');
       }
+      if (result.reachedServer) {
+        await _refreshCollective();
+      }
+    } finally {
+      if (mounted) setState(() => _isManualSyncing = false);
     }
-    if (result.reachedServer) {
-      await _refreshCollective();
-    }
+  }
+
+  Future<void> _handleManualSync() async {
+    _showSnack('🔄 Sincronizando con la nube de Origo...');
+    await _attemptAutoSync(notifyOnSuccess: true, force: true);
   }
 
   Future<void> _refreshCollective() async {
@@ -665,6 +699,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
     }
 
     final lowCount = _inventory.where((e) => e.isCritical).length;
+    final hasPendingMovements = _recentMovements.any((m) => !m.synced);
 
     return Scaffold(
       body: Column(
@@ -674,6 +709,9 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
             storeLocation: '${_currentUser!.businessName} · ${_currentUser!.zone}',
             documentId: _currentUser!.documentId,
             address: _currentUser!.address,
+            hasPendingSync: hasPendingMovements,
+            isSyncing: _isManualSyncing,
+            onManualSync: _handleManualSync,
             onShowPrivacy: () => showOrigoPrivacyDialog(context),
             onConfigureServer: kDebugMode ? _openServerConfigDialog : null,
             onLogout: _onLogout,
@@ -692,6 +730,8 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
                   onToggleMic: _toggleMic,
                   onOpenCommunity: () => setState(() => _selectedTab = 2),
                   onToggleHistory: () => setState(() => _isHistoryExpanded = !_isHistoryExpanded),
+                  onManualSync: _handleManualSync,
+                  isSyncing: _isManualSyncing,
                 ),
                 InventoryScreen(
                   inventory: _inventory,

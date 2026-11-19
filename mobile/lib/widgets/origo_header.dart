@@ -8,6 +8,9 @@ class OrigoHeader extends StatelessWidget {
   final VoidCallback? onConfigureServer;
   final VoidCallback? onShowPrivacy;
   final VoidCallback? onLogout;
+  final bool hasPendingSync;
+  final bool isSyncing;
+  final VoidCallback? onManualSync;
 
   const OrigoHeader({
     super.key,
@@ -18,6 +21,9 @@ class OrigoHeader extends StatelessWidget {
     this.onConfigureServer,
     this.onShowPrivacy,
     this.onLogout,
+    this.hasPendingSync = false,
+    this.isSyncing = false,
+    this.onManualSync,
   });
 
   @override
@@ -55,6 +61,27 @@ class OrigoHeader extends StatelessWidget {
               ),
               Row(
                 children: [
+                  if (hasPendingSync || isSyncing)
+                    IconButton(
+                      onPressed: isSyncing ? null : onManualSync,
+                      icon: isSyncing
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.cloud_upload_rounded,
+                              color: Color(0xFFFDE68A),
+                              size: 24,
+                            ),
+                      tooltip: isSyncing
+                          ? 'Sincronizando con la nube...'
+                          : 'Sincronizar cambios pendientes con la nube',
+                    ),
                   if (onShowPrivacy != null)
                     IconButton(
                       onPressed: onShowPrivacy,

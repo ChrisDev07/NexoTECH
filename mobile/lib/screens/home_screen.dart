@@ -11,6 +11,8 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback onToggleMic;
   final VoidCallback onOpenCommunity;
   final VoidCallback onToggleHistory;
+  final Future<void> Function()? onManualSync;
+  final bool isSyncing;
 
   const HomeScreen({
     super.key,
@@ -23,13 +25,16 @@ class HomeScreen extends StatelessWidget {
     required this.onToggleMic,
     required this.onOpenCommunity,
     required this.onToggleHistory,
+    this.onManualSync,
+    this.isSyncing = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasPending = recentMovements.any((m) => !m.synced);
 
-    return ListView(
+    final list = ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       children: [
         // Tarjeta Hero de Voz
@@ -147,14 +152,57 @@ class HomeScreen extends StatelessWidget {
                 ),
                 Row(
                   children: [
-                    Text(
-                      hasPending ? '⏳ Pendientes' : '☁️ Al día',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: hasPending
-                            ? const Color(0xFFB45309)
-                            : const Color(0xFF047857),
+                    InkWell(
+                      onTap: onManualSync,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: hasPending
+                              ? const Color(0xFFFEF3C7)
+                              : const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: hasPending
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFFA7F3D0),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (isSyncing)
+                              const SizedBox(
+                                width: 11,
+                                height: 11,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFFB45309),
+                                ),
+                              )
+                            else
+                              Icon(
+                                hasPending ? Icons.sync_rounded : Icons.cloud_done_rounded,
+                                size: 13,
+                                color: hasPending
+                                    ? const Color(0xFFB45309)
+                                    : const Color(0xFF047857),
+                              ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isSyncing
+                                  ? 'Sincronizando...'
+                                  : (hasPending ? '⏳ Pendientes (Sincronizar)' : '☁️ Al día'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: hasPending
+                                    ? const Color(0xFFB45309)
+                                    : const Color(0xFF047857),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -219,5 +267,13 @@ class HomeScreen extends StatelessWidget {
           }),
       ],
     );
+
+    return onManualSync != null
+        ? RefreshIndicator(
+            onRefresh: onManualSync!,
+            color: const Color(0xFF047857),
+            child: list,
+          )
+        : list;
   }
 }

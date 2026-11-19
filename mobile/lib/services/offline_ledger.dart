@@ -579,7 +579,17 @@ class OfflineLedgerService {
     final rows = await db.query('settings', where: 'key = ?', whereArgs: ['server_url']);
     if (rows.isNotEmpty) {
       final val = rows.first['value']?.toString().trim() ?? '';
-      if (val.isNotEmpty) return val;
+      // Si la URL guardada es la IP antigua local de desarrollo, migrar a la URL cloud de producción
+      if (val.isNotEmpty &&
+          !val.contains('10.209.55.173') &&
+          !val.contains('10.0.2.2') &&
+          !val.contains('localhost') &&
+          !val.contains('127.0.0.1')) {
+        return val;
+      } else if (val.contains('10.209.55.173')) {
+        // Limpiar para que tome la URL oficial de producción
+        await db.delete('settings', where: 'key = ?', whereArgs: ['server_url']);
+      }
     }
     return _defaultServerUrl;
   }
