@@ -6,7 +6,7 @@ use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use unicode_normalization::UnicodeNormalization;
 
-const EMBEDDED_CATALOG_JSON: &str = include_str!("../../core_nlp/catalog.json");
+const EMBEDDED_CATALOG_JSON: &str = include_str!("../catalog.json");
 
 fn sparse_number(word: &str) -> Option<f64> {
     match word {

@@ -5,7 +5,7 @@
 # ==============================================================================
 
 # --- Etapa 1: Compilación ---
-FROM rust:1.80-slim-bookworm AS builder
+FROM rust:slim-bookworm AS builder
 
 WORKDIR /build
 
@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copiar manifiestos y código fuente
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml Cargo.lock catalog.json ./
 COPY src ./src
 
 # Compilar en modo Release con optimizaciones máximas

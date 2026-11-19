@@ -1,0 +1,134 @@
+{
+  "units": [
+    "bulto", "bultos",
+    "arroba", "arrobas",
+    "carga", "cargas",
+    "paca", "pacas",
+    "canastilla", "canastillas",
+    "caja", "cajas",
+    "galon", "galones", "galón",
+    "kilo", "kilos", "kg",
+    "libra", "libras",
+    "unidad", "unidades",
+    "botella", "botellas",
+    "saco", "sacos"
+  ],
+  "intentions": {
+    "IN": [
+      "llegaron", "llego", "llegó",
+      "recibi", "recibí", "recibimos",
+      "compre", "compré", "compramos",
+      "entran", "entra", "entraron",
+      "ingreso", "ingresó", "ingresaron",
+      "descargaron", "trajeron", "abasteci", "abastecí",
+      "entrada", "entradas", "compra", "compras"
+    ],
+    "OUT": [
+      "venta", "ventas", "vende", "vender",
+      "vendi", "vendí", "vendimos", "vendio", "vendió", "vendieron",
+      "salio", "salió", "salieron", "salida", "salidas",
+      "se llevaron", "llevaron", "lleva", "llevan",
+      "despache", "despaché", "despachamos", "despacho", "despachó",
+      "saque", "saqué", "sacaron",
+      "gaste", "gasté", "consumi", "consumí"
+    ]
+  },
+  "products": [
+    {
+      "id": "prod_arroz_casanare",
+      "name": "Arroz Casanareño",
+      "category": "Granos y Víveres",
+      "default_unit": "bultos",
+      "retail_price_cop": 185000,
+      "wholesale_price_cop": 155000,
+      "min_threshold": 10,
+      "synonyms": [
+        "arroz", "arroz casanare", "arros", "arrosito", "arroz diana", "arroz florhuila", "arroz orinoquia"
+      ]
+    },
+    {
+      "id": "prod_aceite_vegetal",
+      "name": "Aceite Vegetal 900ml",
+      "category": "Víveres",
+      "default_unit": "cajas",
+      "retail_price_cop": 115000,
+      "wholesale_price_cop": 94000,
+      "min_threshold": 5,
+      "synonyms": [
+        "aceite", "aceite vegetal", "aceite de cocina", "caja de aceite", "aceites", "aceite diana", "aceite premier"
+      ]
+    },
+    {
+      "id": "prod_panela_criolla",
+      "name": "Panela Criolla",
+      "category": "Víveres",
+      "default_unit": "pacas",
+      "retail_price_cop": 68000,
+      "wholesale_price_cop": 54000,
+      "min_threshold": 8,
+      "synonyms": [
+        "panela", "panela criolla", "paca de panela", "panela cuadrada", "panela redonda"
+      ]
+    },
+    {
+      "id": "prod_papa_pastusa",
+      "name": "Papa Pastusa / Criolla",
+      "category": "Perecederos",
+      "default_unit": "arrobas",
+      "retail_price_cop": 48000,
+      "wholesale_price_cop": 38000,
+      "min_threshold": 6,
+      "synonyms": [
+        "papa", "papa pastusa", "papa criolla", "papas", "arroba de papa"
+      ]
+    },
+    {
+      "id": "prod_abono_triple15",
+      "name": "Abono Triple 15",
+      "category": "Agroinsumos",
+      "default_unit": "bultos",
+      "retail_price_cop": 210000,
+      "wholesale_price_cop": 178000,
+      "min_threshold": 12,
+      "synonyms": [
+        "abono", "triple 15", "abono triple 15", "fertilizante", "triple quince", "abono para cultivo"
+      ]
+    },
+    {
+      "id": "prod_cemento_gris",
+      "name": "Cemento Gris 50kg",
+      "category": "Ferretería",
+      "default_unit": "bultos",
+      "retail_price_cop": 34000,
+      "wholesale_price_cop": 28500,
+      "min_threshold": 20,
+      "synonyms": [
+        "cemento", "cemento gris", "bulto de cemento", "cemento argos", "cemento oriente"
+      ]
+    },
+    {
+      "id": "prod_sal_marina",
+      "name": "Sal Marina Refinada",
+      "category": "Víveres",
+      "default_unit": "bultos",
+      "retail_price_cop": 55000,
+      "wholesale_price_cop": 43000,
+      "min_threshold": 5,
+      "synonyms": [
+        "sal", "sal marina", "bulto de sal", "sal refinada", "sal blanca"
+      ]
+    },
+    {
+      "id": "prod_harina_pan",
+      "name": "Harina de Maíz Precocida",
+      "category": "Víveres",
+      "default_unit": "pacas",
+      "retail_price_cop": 72000,
+      "wholesale_price_cop": 59000,
+      "min_threshold": 7,
+      "synonyms": [
+        "harina", "harina pan", "harina de maiz", "harina precocida"
+      ]
+    }
+  ]
+}
