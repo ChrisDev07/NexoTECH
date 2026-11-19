@@ -1,0 +1,56 @@
+version: '3.8'
+
+# ==============================================================================
+# ORIGO - Despliegue en Producción con Docker y HTTPS Automático (Caddy)
+# Equipo NexoTECH · CREATIC Casanare
+# ==============================================================================
+
+services:
+  origo-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: origo_backend
+    restart: always
+    environment:
+      - PORT=8000
+      - ORIGO_DB_PATH=/app/data/origo_data.db
+      - ORIGO_STATIC_DIR=/app/static
+    volumes:
+      - origo_data:/app/data
+    networks:
+      - origo_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Proxy inverso Caddy con HTTPS / TLS automático (Let's Encrypt)
+  caddy:
+    image: caddy:2-alpine
+    container_name: origo_caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${ORIGO_DOMAIN:-localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - origo-backend
+    networks:
+      - origo_network
+
+volumes:
+  origo_data:
+    name: origo_production_sqlite_data
+  caddy_data:
+  caddy_config:
+
+networks:
+  origo_network:
+    name: origo_internal_net

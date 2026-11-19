@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'models/merchant_profile.dart';
 import 'models/movement_log.dart';
@@ -674,7 +675,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
             documentId: _currentUser!.documentId,
             address: _currentUser!.address,
             onShowPrivacy: () => showOrigoPrivacyDialog(context),
-            onConfigureServer: _openServerConfigDialog,
+            onConfigureServer: kDebugMode ? _openServerConfigDialog : null,
             onLogout: _onLogout,
           ),
           Expanded(

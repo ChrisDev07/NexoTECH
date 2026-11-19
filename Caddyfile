@@ -1,0 +1,19 @@
+# Caddyfile para Origo en Producción
+# Provee HTTPS automático, compresión zstd/gzip y cabeceras de proxy seguro.
+
+{$DOMAIN:localhost} {
+    # Proxy inverso hacia el backend en Rust
+    reverse_proxy origo-backend:8000 {
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Real-IP {remote_host}
+    }
+
+    # Compresión automática
+    encode zstd gzip
+
+    # Logs de acceso estructurados
+    log {
+        output stdout
+        format console
+    }
+}

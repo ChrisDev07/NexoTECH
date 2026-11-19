@@ -12,7 +12,10 @@ import '../models/merchant_profile.dart';
 /// 3. `settings`: URL del servidor y sesión activa persistente.
 class OfflineLedgerService {
   static const _dbName = 'origo_local_ledger.db';
-  static const _defaultServerUrl = 'http://10.209.55.173:8000';
+  static const _defaultServerUrl = String.fromEnvironment(
+    'SERVER_URL',
+    defaultValue: 'http://10.209.55.173:8000',
+  );
   static const _uuid = Uuid();
   Database? _db;
 

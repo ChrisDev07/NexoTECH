@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: origo-backend
+    runtime: docker
+    dockerfilePath: Dockerfile
+    dockerContext: backend
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: ORIGO_DB_PATH
+        value: "/app/data/origo_data.db"
+      - key: ORIGO_STATIC_DIR
+        value: "/app/static"
+    healthCheckPath: /api/health
+    autoDeploy: true
