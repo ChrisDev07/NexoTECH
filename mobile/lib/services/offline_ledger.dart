@@ -14,7 +14,7 @@ class OfflineLedgerService {
   static const _dbName = 'origo_local_ledger.db';
   static const _defaultServerUrl = String.fromEnvironment(
     'SERVER_URL',
-    defaultValue: 'http://10.209.55.173:8000',
+    defaultValue: 'https://origo-6abz.onrender.com',
   );
   static const _uuid = Uuid();
   Database? _db;

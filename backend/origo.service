@@ -1,0 +1,24 @@
+[Unit]
+Description=Origo Backend REST API (Rust Axum)
+After=network.target
+
+[Service]
+Type=simple
+User=origo
+Group=origo
+WorkingDirectory=/opt/origo/backend
+Environment=PORT=8000
+Environment=ORIGO_DB_PATH=/opt/origo/backend/origo_data.db
+Environment=ORIGO_STATIC_DIR=/opt/origo/backend/static
+ExecStart=/opt/origo/backend/origo-server 8000
+Restart=always
+RestartSec=5s
+
+# Endurecimiento de Seguridad Systemd (OWASP A05)
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

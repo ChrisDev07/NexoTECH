@@ -627,7 +627,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
               keyboardType: TextInputType.url,
               decoration: const InputDecoration(
                 labelText: 'URL del servidor',
-                hintText: 'http://10.209.55.173:8000',
+                hintText: 'https://origo-6abz.onrender.com',
               ),
             ),
           ],
