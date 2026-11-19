@@ -668,6 +668,16 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
         ),
         actions: [
           TextButton(
+            onPressed: () async {
+              ctrl.text = 'https://origo-6abz.onrender.com';
+              await _ledger.setServerUrl('https://origo-6abz.onrender.com');
+              if (ctx.mounted) Navigator.pop(ctx);
+              _showSnack('✔ URL restablecida a la nube oficial.');
+              await _attemptAutoSync(notifyOnSuccess: true, force: true);
+            },
+            child: const Text('Nube Oficial', style: TextStyle(color: Color(0xFF047857), fontWeight: FontWeight.bold)),
+          ),
+          TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancelar'),
           ),
@@ -678,7 +688,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
                 await _ledger.setServerUrl(url);
                 if (ctx.mounted) Navigator.pop(ctx);
                 _showSnack('✔ Servidor guardado. Sincronizando...');
-                await _attemptAutoSync(notifyOnSuccess: true);
+                await _attemptAutoSync(notifyOnSuccess: true, force: true);
               }
             },
             child: const Text('Guardar y sincronizar'),
@@ -695,6 +705,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
         ledger: _ledger,
         sync: _sync,
         onAuthenticated: _onUserAuthenticated,
+        onConfigureServer: _openServerConfigDialog,
       );
     }
 
@@ -713,7 +724,7 @@ class _OrigoHomeShellState extends State<OrigoHomeShell> {
             isSyncing: _isManualSyncing,
             onManualSync: _handleManualSync,
             onShowPrivacy: () => showOrigoPrivacyDialog(context),
-            onConfigureServer: kDebugMode ? _openServerConfigDialog : null,
+            onConfigureServer: _openServerConfigDialog,
             onLogout: _onLogout,
           ),
           Expanded(

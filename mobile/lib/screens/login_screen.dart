@@ -8,12 +8,14 @@ class LoginScreen extends StatefulWidget {
   final OfflineLedgerService ledger;
   final AutoSyncService sync;
   final void Function(MerchantProfile profile) onAuthenticated;
+  final VoidCallback? onConfigureServer;
 
   const LoginScreen({
     super.key,
     required this.ledger,
     required this.sync,
     required this.onAuthenticated,
+    this.onConfigureServer,
   });
 
   @override
@@ -145,14 +147,17 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(30)),
             ),
-            child: const Column(
+            child: Column(
               children: [
-                Text(
-                  '🌾 ORIGO',
-                  style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
+                GestureDetector(
+                  onLongPress: widget.onConfigureServer,
+                  child: const Text(
+                    '🌾 ORIGO',
+                    style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900),
+                  ),
                 ),
-                SizedBox(height: 8),
-                Text(
+                const SizedBox(height: 8),
+                const Text(
                   'Inventario por voz sin internet y compras en comunidad para Casanare',
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.white70, fontSize: 15),
